@@ -280,7 +280,18 @@ class PatientNewOrder extends StatelessWidget {
       _item(context, "سيروم", "2500 دج", Icons.water_drop, Colors.blue),
       _item(context, "تغيير ضماد", "1200 دج", Icons.healing, Colors.purple),
       _item(context, "قياس ضغط", "500 دج", Icons.monitor_heart, Colors.red),
-      InkWell(onTap: () => _custom(context), child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade300, style: BorderStyle.dashed)), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_circle, size: 45, color: Colors.grey[400]), const SizedBox(height: 10), Text("طلب خدمة أخرى", style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold))]))),
+      InkWell(
+        onTap: () => _custom(context), 
+        // هنا كان الخطأ، أصلحناه بجعل الإطار solid (متصل)
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white, 
+            borderRadius: BorderRadius.circular(20), 
+            border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid)
+          ), 
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_circle, size: 45, color: Colors.grey[400]), const SizedBox(height: 10), Text("طلب خدمة أخرى", style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold))])
+        )
+      ),
     ]);
   }
   
@@ -306,7 +317,7 @@ class PatientNewOrder extends StatelessWidget {
   );
 }
 
-// *** التعديل الكبير هنا: بطاقة متابعة الطلب للمريض ***
+// بطاقة متابعة الطلب للمريض
 class PatientMyOrders extends StatelessWidget {
   const PatientMyOrders({super.key});
   @override
@@ -320,7 +331,6 @@ class PatientMyOrders extends StatelessWidget {
           var data = d.data() as Map<String, dynamic>;
           String status = data['status'] ?? 'pending';
           
-          // إذا كان الطلب قيد الانتظار
           if (status == 'pending') {
             return Card(
               color: Colors.orange[50],
@@ -337,9 +347,7 @@ class PatientMyOrders extends StatelessWidget {
                 ),
               ),
             );
-          } 
-          // إذا تم قبول الطلب (إظهار اسم الممرض)
-          else {
+          } else {
             String nurseName = data['nurse_name'] ?? "ممرض";
             bool isCompleted = status == 'completed';
             return Card(
@@ -490,7 +498,6 @@ class NurseMarket extends StatelessWidget {
                         children: [
                           Text(data['price'], style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
                           ElevatedButton(
-                            // *** التعديل المهم هنا: حفظ اسم الممرض عند القبول ***
                             onPressed: () => d.reference.update({
                               'status': 'accepted', 
                               'nurse_id': FirebaseAuth.instance.currentUser?.uid,
