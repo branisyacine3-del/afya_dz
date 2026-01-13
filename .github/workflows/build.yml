@@ -17,6 +17,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.16.0'
+      
+      # هذا هو الأمر السحري الذي سيقوم بإنشاء ملفات الأندرويد الناقصة تلقائياً
+      - run: flutter create .
+      
       - run: flutter pub get
       - run: flutter build apk --release --no-tree-shake-icons
       - uses: actions/upload-artifact@v4
