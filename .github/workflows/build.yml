@@ -21,22 +21,21 @@ jobs:
       
       - run: flutter create .
       
-      # --- قسم الإصلاحات السحرية ---
+      # 1. أوامر الإصلاح المعتادة
       - run: |
-          # 1. إجبار الأندرويد على استخدام النسخة الحديثة 34
           sed -i 's/compileSdkVersion .*/compileSdkVersion 34/g' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 34/g' android/app/build.gradle
           sed -i 's/minSdkVersion .*/minSdkVersion 23/g' android/app/build.gradle
-          
-          # 2. إصلاح لغة Kotlin
           sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.0"/g' android/build.gradle
           sed -i 's/id "org.jetbrains.kotlin.android" version .*/id "org.jetbrains.kotlin.android" version "1.9.0" apply false/g' android/settings.gradle
-          
-          # 3. (الجديد) حقن تصريح GPS داخل ملف AndroidManifest
           sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
 
       - run: flutter pub get
+      
+      # 2. أمر تركيب الأيقونة الجديدة
+      - run: dart run flutter_launcher_icons
+
       - run: flutter build apk --release --no-tree-shake-icons
       - uses: actions/upload-artifact@v4
         with:
