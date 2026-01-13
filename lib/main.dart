@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 
+// إعدادات فايربيس
 const FirebaseOptions firebaseOptions = FirebaseOptions(
   apiKey: "AIzaSyDlQHl2B8d_8nw8-N6_51MEH4j_KYqz7NA",
   authDomain: "afya-dz.firebaseapp.com",
@@ -20,7 +21,7 @@ Future<void> main() async {
   try {
     await Firebase.initializeApp(options: firebaseOptions);
   } catch (e) {
-    print("Firebase Error: $e");
+    print("Error: $e");
   }
   runApp(const AfyaApp());
 }
@@ -30,8 +31,8 @@ class AfyaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Afya DZ',
       debugShowCheckedModeBanner: false,
+      title: 'Afya DZ',
       theme: ThemeData(primarySwatch: Colors.blue),
       home: const SplashScreen(),
     );
@@ -62,6 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _pass = TextEditingController();
   bool _loading = false;
+
   Future<void> _auth() async {
     setState(() => _loading = true);
     try {
@@ -76,40 +78,33 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     if(mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const WelcomeScreen()));
   }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      TextField(controller: _email, decoration: const InputDecoration(labelText: "Email")),
-      TextField(controller: _pass, obscureText: true, decoration: const InputDecoration(labelText: "Password")),
-      const SizedBox(height: 20),
-      _loading ? const CircularProgressIndicator() : ElevatedButton(onPressed: _auth, child: const Text("Login"))
-    ])),
-  );
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        TextField(controller: _email, decoration: const InputDecoration(labelText: "Email")),
+        TextField(controller: _pass, obscureText: true, decoration: const InputDecoration(labelText: "Password")),
+        const SizedBox(height: 20),
+        _loading ? const CircularProgressIndicator() : ElevatedButton(onPressed: _auth, child: const Text("Login"))
+      ])),
+    );
+  }
 }
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Welcome")),
-    body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      ElevatedButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientScreen())), child: const Text("I am Patient")),
-      const SizedBox(height: 20),
-      ElevatedButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NurseScreen())), child: const Text("I am Nurse")),
-    ])),
-  );
-}
-
-class PatientScreen extends StatelessWidget {
-  const PatientScreen({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Services")),
-    body: ListView(children: [
-      ListTile(title: const Text("Injection (800 DA)"), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderScreen(title: "Injection", price: 800)))),
-      ListTile(title: const Text("Serum (2500 DA)"), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderScreen(title: "Serum", price: 2500)))),
-    ]),
-  );
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Welcome")),
+      body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        ElevatedButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderScreen(title: "Injection", price: 800))), child: const Text("Request Service")),
+        const SizedBox(height: 20),
+        ElevatedButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NurseScreen())), child: const Text("Nurse Dashboard")),
+      ])),
+    );
+  }
 }
 
 class OrderScreen extends StatefulWidget {
@@ -121,15 +116,10 @@ class OrderScreen extends StatefulWidget {
 class _OrderScreenState extends State<OrderScreen> {
   final _phone = TextEditingController();
   double? _lat, _lng;
-  String _status = "Locating...";
-  
-  @override
-  void initState() {
-    super.initState();
-    _getLocation();
-  }
-  
+  String _status = "Click button to locate";
+
   Future<void> _getLocation() async {
+    setState(() => _status = "Locating...");
     try {
       LocationPermission p = await Geolocator.checkPermission();
       if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
@@ -139,26 +129,29 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(widget.title)),
-    body: Padding(padding: const EdgeInsets.all(20), child: Column(children: [
-      TextField(controller: _phone, decoration: const InputDecoration(labelText: "Phone Number")),
-      const SizedBox(height: 20),
-      Text(_status),
-      const Spacer(),
-      ElevatedButton(
-        onPressed: () {
-          if (_lat == null) return;
-          FirebaseFirestore.instance.collection('requests').add({
-            'service': widget.title, 'price': widget.price, 'phone': _phone.text,
-            'lat': _lat, 'lng': _lng, 'status': 'pending'
-          });
-          Navigator.pop(context);
-        }, 
-        child: const Text("Send Request")
-      )
-    ])),
-  );
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.title)),
+      body: Padding(padding: const EdgeInsets.all(20), child: Column(children: [
+        TextField(controller: _phone, decoration: const InputDecoration(labelText: "Phone")),
+        const SizedBox(height: 20),
+        Text(_status),
+        IconButton(icon: const Icon(Icons.my_location), onPressed: _getLocation),
+        const Spacer(),
+        ElevatedButton(
+          onPressed: () {
+            if (_lat == null) return;
+            FirebaseFirestore.instance.collection('requests').add({
+              'service': widget.title, 'price': widget.price, 'phone': _phone.text,
+              'lat': _lat, 'lng': _lng, 'status': 'pending'
+            });
+            Navigator.pop(context);
+          },
+          child: const Text("Send")
+        )
+      ])),
+    );
+  }
 }
 
 class NurseScreen extends StatelessWidget {
@@ -178,7 +171,7 @@ class NurseScreen extends StatelessWidget {
               subtitle: Text(data['phone'] ?? ""),
               trailing: IconButton(
                 icon: const Icon(Icons.map, color: Colors.blue),
-                // تم تصحيح الرابط هنا
+                // تم التصحيح هنا: استخدام الطريقة الصحيحة لدمج النصوص
                 onPressed: () => launchUrl(Uri.parse("https://www.google.com/maps/search/?api=1&query=${data['lat']},${data['lng']}")),
               ),
             );
