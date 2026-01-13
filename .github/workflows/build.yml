@@ -21,12 +21,17 @@ jobs:
       
       - run: flutter create .
       
-      # هنا الحل النهائي: نجبر الأندرويد على استخدام النسخة 34 واللغة الحديثة 1.9.0
+      # هنا الحل الشامل: نغير النسخة في الملفين (القديم والجديد) لنضمن النجاح 100%
       - run: |
           sed -i 's/compileSdkVersion .*/compileSdkVersion 34/g' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 34/g' android/app/build.gradle
           sed -i 's/minSdkVersion .*/minSdkVersion 23/g' android/app/build.gradle
+          
+          # تعديل الملف الأول (build.gradle)
           sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.0"/g' android/build.gradle
+          
+          # تعديل الملف الثاني الخفي (settings.gradle) <- هذا هو سبب المشكلة السابقة
+          sed -i 's/id "org.jetbrains.kotlin.android" version .*/id "org.jetbrains.kotlin.android" version "1.9.0" apply false/g' android/settings.gradle
 
       - run: flutter pub get
       - run: flutter build apk --release --no-tree-shake-icons
