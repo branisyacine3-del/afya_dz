@@ -21,15 +21,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  # الأداة المسؤولة عن تغيير الأيقونة
+  # الأداة التي ستغير الأيقونة
   flutter_launcher_icons: ^0.13.1
 
-# إعدادات الأيقونة (باسم صورتك بالضبط)
+flutter:
+  uses-material-design: true
+
+# --- هنا مربط الفرس ---
+# إعدادات الأيقونة: لقد وضعت اسم صورتك هنا
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
   image_path: "Picsart_26-01-13_14-44-32-327.jpg"
   min_sdk_android: 21
-
-flutter:
-  uses-material-design: true
