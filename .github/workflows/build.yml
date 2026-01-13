@@ -15,18 +15,18 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
       
-      # تحديث نسخة فلاتر إلى 3.19.0 لأنها تدعم أندرويد 34 بشكل أفضل
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
       
       - run: flutter create .
       
-      # هذا هو الحل السحري: أمر يجبر الملفات على التحول إلى نسخة 34
+      # هنا الحل النهائي: نجبر الأندرويد على استخدام النسخة 34 واللغة الحديثة 1.9.0
       - run: |
           sed -i 's/compileSdkVersion .*/compileSdkVersion 34/g' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 34/g' android/app/build.gradle
           sed -i 's/minSdkVersion .*/minSdkVersion 23/g' android/app/build.gradle
+          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.0"/g' android/build.gradle
 
       - run: flutter pub get
       - run: flutter build apk --release --no-tree-shake-icons
