@@ -10,12 +10,13 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
-  # تحديث المكتبات لتتوافق مع فلاتر 3.19
   firebase_core: ^2.27.0
   firebase_auth: ^4.17.8
   cloud_firestore: ^4.15.8
   url_launcher: ^6.2.5
   geolocator: ^11.0.0
+  # هذه هي المكتبة الناقصة التي سببت المشكلة
+  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:
