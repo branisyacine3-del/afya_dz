@@ -21,17 +21,20 @@ jobs:
       
       - run: flutter create .
       
-      # هنا الحل الشامل: نغير النسخة في الملفين (القديم والجديد) لنضمن النجاح 100%
+      # --- قسم الإصلاحات السحرية ---
       - run: |
+          # 1. إجبار الأندرويد على استخدام النسخة الحديثة 34
           sed -i 's/compileSdkVersion .*/compileSdkVersion 34/g' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 34/g' android/app/build.gradle
           sed -i 's/minSdkVersion .*/minSdkVersion 23/g' android/app/build.gradle
           
-          # تعديل الملف الأول (build.gradle)
+          # 2. إصلاح لغة Kotlin
           sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.0"/g' android/build.gradle
-          
-          # تعديل الملف الثاني الخفي (settings.gradle) <- هذا هو سبب المشكلة السابقة
           sed -i 's/id "org.jetbrains.kotlin.android" version .*/id "org.jetbrains.kotlin.android" version "1.9.0" apply false/g' android/settings.gradle
+          
+          # 3. (الجديد) حقن تصريح GPS داخل ملف AndroidManifest
+          sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
 
       - run: flutter pub get
       - run: flutter build apk --release --no-tree-shake-icons
