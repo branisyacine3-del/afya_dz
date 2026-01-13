@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+import 'package:intl/intl.dart' as intl; // للتنسيق التاريخ إن لزم
 
 // إعدادات فايربيس
 const FirebaseOptions firebaseOptions = FirebaseOptions(
@@ -36,9 +37,9 @@ class AfyaApp extends StatelessWidget {
       title: 'Afya DZ',
       theme: ThemeData(
         useMaterial3: true,
-        fontFamily: 'Roboto', // خط نظيف
+        fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF009688), // لون أساسي طبي
+          seedColor: const Color(0xFF009688),
           primary: const Color(0xFF009688),
           secondary: const Color(0xFFFF9800),
         ),
@@ -46,9 +47,6 @@ class AfyaApp extends StatelessWidget {
           filled: true,
           fillColor: Colors.grey[50],
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.grey.shade200)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF009688), width: 2)),
-          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
         ),
       ),
       home: const SplashScreen(),
@@ -56,7 +54,7 @@ class AfyaApp extends StatelessWidget {
   }
 }
 
-// 1. شاشة البداية (لوجو متحرك بسيط)
+// 1. شاشة البداية
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override
@@ -84,15 +82,14 @@ class _SplashScreenState extends State<SplashScreen> {
         child: const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(Icons.local_hospital_rounded, size: 100, color: Colors.white),
           SizedBox(height: 20),
-          Text("Afya DZ", style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-          Text("رعايتك الصحية.. في منزلك", style: TextStyle(color: Colors.white70, fontSize: 16)),
+          Text("Afya DZ", style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
         ])),
       ),
     );
   }
 }
 
-// 2. شاشة الدخول والتسجيل (تصميم كارت)
+// 2. شاشة الدخول والتسجيل (إصلاح الأخطاء)
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -103,7 +100,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _pass = TextEditingController();
   bool _loading = false;
 
-  void _showError(String msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700, behavior: SnackBarBehavior.floating));
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700, behavior: SnackBarBehavior.floating)
+    );
+  }
 
   Future<void> _doLogin() async {
     setState(() => _loading = true);
@@ -111,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await FirebaseAuth.instance.signInWithEmailAndPassword(email: _email.text.trim(), password: _pass.text.trim());
       if(mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const WelcomeScreen()));
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found' || e.code == 'invalid-credential') _showError("حساب غير موجود، يمكنك إنشاء حساب جديد");
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential') _showError("حساب غير موجود أو كلمة مرور خاطئة");
       else if (e.code == 'wrong-password') _showError("كلمة المرور غير صحيحة ❌");
       else _showError("خطأ: ${e.message}");
     }
@@ -123,8 +124,16 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await FirebaseAuth.instance.createUserWithEmailAndPassword(email: _email.text.trim(), password: _pass.text.trim());
       if(mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const NameInputScreen()));
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        _showError("هذا البريد مسجل بالفعل! يرجى تسجيل الدخول.");
+      } else if (e.code == 'weak-password') {
+        _showError("كلمة المرور ضعيفة جداً");
+      } else {
+        _showError("حدث خطأ: ${e.message}");
+      }
     } catch (e) {
-      _showError("حدث خطأ أثناء التسجيل: $e");
+      _showError("خطأ غير متوقع: $e");
     }
     setState(() => _loading = false);
   }
@@ -134,43 +143,30 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 40),
-              const Text("مرحباً بك 👋", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF009688))),
-              const Text("سجل الدخول للمتابعة", style: TextStyle(color: Colors.grey, fontSize: 16)),
-              const SizedBox(height: 40),
-              TextField(controller: _email, decoration: const InputDecoration(labelText: "البريد الإلكتروني", prefixIcon: Icon(Icons.email_outlined))),
-              const SizedBox(height: 20),
-              TextField(controller: _pass, obscureText: true, decoration: const InputDecoration(labelText: "كلمة المرور", prefixIcon: Icon(Icons.lock_outlined))),
-              const SizedBox(height: 30),
-              _loading ? const Center(child: CircularProgressIndicator()) : Column(
-                children: [
-                  ElevatedButton(
-                    onPressed: _doLogin,
-                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55), backgroundColor: const Color(0xFF009688), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                    child: const Text("تسجيل الدخول", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(height: 15),
-                  OutlinedButton(
-                    onPressed: _doRegister,
-                    style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), side: const BorderSide(color: Color(0xFF009688))),
-                    child: const Text("إنشاء حساب جديد", style: TextStyle(fontSize: 16, color: Color(0xFF009688))),
-                  ),
-                ],
-              ),
-            ],
-          ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
+        child: Column(
+          children: [
+            const SizedBox(height: 40),
+            const Text("مرحباً بك 👋", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF009688))),
+            const SizedBox(height: 40),
+            TextField(controller: _email, decoration: const InputDecoration(labelText: "البريد الإلكتروني", prefixIcon: Icon(Icons.email_outlined))),
+            const SizedBox(height: 20),
+            TextField(controller: _pass, obscureText: true, decoration: const InputDecoration(labelText: "كلمة المرور", prefixIcon: Icon(Icons.lock_outlined))),
+            const SizedBox(height: 30),
+            _loading ? const CircularProgressIndicator() : Column(
+              children: [
+                ElevatedButton(onPressed: _doLogin, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55), backgroundColor: const Color(0xFF009688)), child: const Text("تسجيل الدخول", style: TextStyle(color: Colors.white, fontSize: 18))),
+                const SizedBox(height: 15),
+                OutlinedButton(onPressed: _doRegister, style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 55)), child: const Text("إنشاء حساب جديد")),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// 3. شاشة إدخال الاسم
 class NameInputScreen extends StatefulWidget {
   const NameInputScreen({super.key});
   @override
@@ -186,190 +182,157 @@ class _NameInputScreenState extends State<NameInputScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("بياناتك الشخصية"), centerTitle: true),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 80),
-            const SizedBox(height: 20),
-            const Text("تم إنشاء الحساب بنجاح!", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 30),
-            TextField(controller: _nameController, decoration: const InputDecoration(labelText: "الاسم الكامل", prefixIcon: Icon(Icons.person))),
-            const SizedBox(height: 30),
-            ElevatedButton(onPressed: _saveName, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55), backgroundColor: const Color(0xFF009688)), child: const Text("ابدأ الاستخدام", style: TextStyle(color: Colors.white, fontSize: 18))),
-          ],
-        ),
-      ),
+      appBar: AppBar(title: const Text("الاسم")),
+      body: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
+        const Text("ما هو اسمك الكامل؟", style: TextStyle(fontSize: 20)),
+        const SizedBox(height: 20),
+        TextField(controller: _nameController, decoration: const InputDecoration(labelText: "الاسم", prefixIcon: Icon(Icons.person))),
+        const SizedBox(height: 20),
+        ElevatedButton(onPressed: _saveName, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF009688)), child: const Text("حفظ ومتابعة", style: TextStyle(color: Colors.white))),
+      ])),
     );
   }
 }
 
-// 4. الشاشة الرئيسية (أزرار كبيرة وفخمة)
+// 3. الشاشة الرئيسية
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text("أهلاً، ${user?.displayName ?? 'يا بطل'}", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if(context.mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-            }
-          )
-        ],
+        title: Text("أهلاً، ${user?.displayName ?? ''}"),
+        actions: [IconButton(icon: const Icon(Icons.logout, color: Colors.red), onPressed: () async { await FirebaseAuth.instance.signOut(); if(context.mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen())); })],
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildBigButton(context, "أنا مريض", "أبحث عن ممرض في الحال", Icons.person_search, const Color(0xFF2196F3), const PatientScreen()),
+            _card(context, "أنا مريض", "طلب خدمة + متابعة طلباتي", Icons.person_search, const Color(0xFF2196F3), const PatientHomeScreen()),
             const SizedBox(height: 20),
-            _buildBigButton(context, "أنا ممرض", "الدخول للوحة التحكم", Icons.medical_services, const Color(0xFF009688), const NurseScreen()),
+            _card(context, "أنا ممرض", "استقبال الطلبات", Icons.medical_services, const Color(0xFF009688), const NurseDashboard()),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildBigButton(BuildContext context, String title, String sub, IconData icon, Color color, Widget page) {
-    return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
-      child: Container(
-        height: 120,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: color.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 5))],
-          border: Border.all(color: color.withOpacity(0.1)),
-        ),
-        child: Row(
-          children: [
-            Container(width: 10, decoration: BoxDecoration(color: color, borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)))),
-            const SizedBox(width: 20),
-            Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, color: color, size: 35)),
-            const SizedBox(width: 20),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              Text(sub, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-            ]),
-            const Spacer(),
-            Icon(Icons.arrow_forward_ios, color: Colors.grey[300]),
-            const SizedBox(width: 20),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _card(BuildContext context, String t, String s, IconData i, Color c, Widget p) => GestureDetector(
+    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => p)),
+    child: Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: c.withOpacity(0.2), blurRadius: 10)], border: Border.all(color: c.withOpacity(0.1))),
+      child: Row(children: [Icon(i, size: 40, color: c), const SizedBox(width: 20), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), Text(s, style: TextStyle(color: Colors.grey[600]))])]),
+    ),
+  );
 }
 
-// 5. شاشة الخدمات (مع خيار "أخرى")
-class PatientScreen extends StatelessWidget {
-  const PatientScreen({super.key});
-
-  // نافذة الطلب الخاص
-  void _showCustomOrderDialog(BuildContext context) {
-    final customController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("خدمة أخرى / خاصة", style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("صف لنا ماذا تحتاج بالضبط:"),
-            const SizedBox(height: 15),
-            TextField(controller: customController, decoration: const InputDecoration(hintText: "مثال: جلسة علاج طبيعي، غيار جرح..")),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("إلغاء", style: TextStyle(color: Colors.grey))),
-          ElevatedButton(
-            onPressed: () {
-              if (customController.text.isNotEmpty) {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => OrderScreen(title: customController.text, price: "حسب الاتفاق")));
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF009688)),
-            child: const Text("متابعة", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
+// 4. قسم المريض (طلب + متابعة)
+class PatientHomeScreen extends StatelessWidget {
+  const PatientHomeScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("اختر الخدمة المطلوبة"), centerTitle: true),
-      body: GridView.count(
-        crossAxisCount: 2, padding: const EdgeInsets.all(16), crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.85,
-        children: [
-          _srvCard(context, "حقن", "800 دج", Icons.vaccines, Colors.orange),
-          _srvCard(context, "سيروم", "2500 دج", Icons.water_drop, Colors.blue),
-          _srvCard(context, "تغيير ضماد", "1200 دج", Icons.healing, Colors.purple),
-          _srvCard(context, "قياس ضغط", "500 دج", Icons.monitor_heart, Colors.red),
-          // الزر الجديد للخدمة الخاصة
-          InkWell(
-            onTap: () => _showCustomOrderDialog(context),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid, width: 2),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add_circle_outline, size: 45, color: Colors.grey[600]),
-                  const SizedBox(height: 10),
-                  Text("خدمة أخرى", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.grey[700])),
-                  const Text("اكتب طلبك الخاص", style: TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _srvCard(BuildContext context, String title, String price, IconData icon, Color color) {
-    return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderScreen(title: title, price: price))),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5))],
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("خدماتي"),
+          bottom: const TabBar(tabs: [Tab(text: "طلب جديد"), Tab(text: "طلباتي السابقة")]),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, size: 35, color: color)),
-            const SizedBox(height: 15),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 5),
-            Text(price, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
+        body: const TabBarView(children: [PatientNewOrder(), PatientMyOrders()]),
       ),
     );
   }
 }
 
-// 6. شاشة تأكيد الطلب (مع تحسين الـ GPS)
+class PatientNewOrder extends StatelessWidget {
+  const PatientNewOrder({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2, padding: const EdgeInsets.all(16), crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.85,
+      children: [
+        _item(context, "حقن", "800 دج", Icons.vaccines, Colors.orange),
+        _item(context, "سيروم", "2500 دج", Icons.water_drop, Colors.blue),
+        _item(context, "تغيير ضماد", "1200 دج", Icons.healing, Colors.purple),
+        _item(context, "قياس ضغط", "500 دج", Icons.monitor_heart, Colors.red),
+        InkWell(
+          onTap: () => _customOrder(context),
+          child: Container(
+            decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade300)),
+            child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add, size: 40), Text("طلب خاص")]),
+          ),
+        ),
+      ],
+    );
+  }
+  void _customOrder(BuildContext context) {
+    final c = TextEditingController();
+    showDialog(context: context, builder: (_) => AlertDialog(
+      title: const Text("اكتب طلبك"), content: TextField(controller: c),
+      actions: [ElevatedButton(onPressed: () {Navigator.pop(context); if(c.text.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (_) => OrderScreen(title: c.text, price: "حسب الاتفاق")));}, child: const Text("تم"))],
+    ));
+  }
+  Widget _item(BuildContext context, String t, String p, IconData i, Color c) => InkWell(
+    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderScreen(title: t, price: p))),
+    child: Container(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10)]),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(i, size: 35, color: c), const SizedBox(height: 10), Text(t, style: const TextStyle(fontWeight: FontWeight.bold)), Text(p, style: const TextStyle(color: Colors.green))]),
+    ),
+  );
+}
+
+// شاشة "طلباتي" للمريض (لتأكيد الإنجاز)
+class PatientMyOrders extends StatelessWidget {
+  const PatientMyOrders({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('requests').where('patient_id', isEqualTo: uid).orderBy('timestamp', descending: true).snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (snap.data!.docs.isEmpty) return const Center(child: Text("لا توجد طلبات سابقة"));
+        return ListView(
+          padding: const EdgeInsets.all(15),
+          children: snap.data!.docs.map((d) {
+            var data = d.data() as Map<String, dynamic>;
+            String status = data['status'] ?? 'pending';
+            Color stColor = status == 'pending' ? Colors.orange : (status == 'accepted' ? Colors.blue : Colors.green);
+            String stText = status == 'pending' ? "جاري البحث عن ممرض..." : (status == 'accepted' ? "الممرض قادم إليك" : "تم الإنجاز ✅");
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 15),
+              child: Padding(
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  children: [
+                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                      Text(data['service'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: stColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Text(stText, style: TextStyle(color: stColor, fontWeight: FontWeight.bold))),
+                    ]),
+                    const SizedBox(height: 10),
+                    // زر التأكيد يظهر فقط إذا كان الطلب "مقبول" ولم ينتهِ بعد
+                    if (status == 'accepted')
+                      ElevatedButton.icon(
+                        onPressed: () => d.reference.update({'status': 'completed'}),
+                        icon: const Icon(Icons.check_circle),
+                        label: const Text("اضغط هنا لتأكيد أن الممرض أنهى عمله"),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
+                      )
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
+// شاشة الطلب (حفظنا فيها ID المريض)
 class OrderScreen extends StatefulWidget {
   final String title; final String price;
   const OrderScreen({super.key, required this.title, required this.price});
@@ -378,172 +341,134 @@ class OrderScreen extends StatefulWidget {
 }
 class _OrderScreenState extends State<OrderScreen> {
   final _phone = TextEditingController();
-  String _status = "اضغط هنا لتحديد موقعك للممرض";
   double? _lat, _lng;
-  bool _loading = false;
-  bool _locationFound = false;
-
-  Future<void> _getLocation() async {
-    setState(() { _loading = true; _status = "جاري تحديد الموقع..."; });
+  String _status = "اضغط لتحديد الموقع";
+  
+  Future<void> _loc() async {
+    setState(() => _status = "جاري التحديد...");
     try {
       LocationPermission p = await Geolocator.checkPermission();
       if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
-      if (p == LocationPermission.deniedForever) {
-        setState(() { _status = "⚠️ يجب تفعيل الموقع من إعدادات الهاتف"; _loading = false; });
-        return;
-      }
       Position pos = await Geolocator.getCurrentPosition();
-      setState(() { _lat = pos.latitude; _lng = pos.longitude; _status = "تم تحديد موقع المنزل بنجاح ✅"; _loading = false; _locationFound = true; });
-    } catch (e) {
-      setState(() { _status = "❌ فشل. تأكد أن GPS يعمل وحاول مجدداً"; _loading = false; });
-    }
+      setState(() { _lat = pos.latitude; _lng = pos.longitude; _status = "تم ✅"; });
+    } catch (e) { setState(() => _status = "فشل GPS"); }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text("تأكيد طلب: ${widget.title}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF009688))),
-            const SizedBox(height: 5),
-            Text("السعر المتوقع: ${widget.price}", style: const TextStyle(fontSize: 16, color: Colors.grey)),
-            const SizedBox(height: 30),
-            TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "رقم هاتفك للتواصل", prefixIcon: Icon(Icons.phone))),
-            const SizedBox(height: 20),
-            InkWell(
-              onTap: _getLocation,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: _locationFound ? Colors.green[50] : Colors.blue[50],
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: _locationFound ? Colors.green : Colors.blue.withOpacity(0.3)),
-                ),
-                child: Row(children: [
-                  _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(_locationFound ? Icons.check_circle : Icons.location_on, color: _locationFound ? Colors.green : Colors.blue),
-                  const SizedBox(width: 15),
-                  Expanded(child: Text(_status, style: TextStyle(color: _locationFound ? Colors.green[800] : Colors.blue[800], fontWeight: FontWeight.bold))),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: () {
-                if(_lat != null && _phone.text.isNotEmpty) {
-                   FirebaseFirestore.instance.collection('requests').add({
-                     'service': widget.title, 
-                     'price': widget.price, 
-                     'phone': _phone.text, 
-                     'lat': _lat, 
-                     'lng': _lng, 
-                     'timestamp': FieldValue.serverTimestamp()
-                   });
-                   Navigator.pop(context);
-                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ تم إرسال طلبك للممرضين بنجاح!"), backgroundColor: Colors.green));
-                } else {
-                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى كتابة الرقم وتحديد الموقع"), backgroundColor: Colors.red));
-                }
-              },
-              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55), backgroundColor: const Color(0xFF009688), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-              child: const Text("تأكيد الطلب الآن", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            )
-          ],
+      body: Padding(padding: const EdgeInsets.all(20), child: Column(children: [
+        TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "رقم الهاتف")),
+        const SizedBox(height: 20),
+        ListTile(title: Text(_status), trailing: const Icon(Icons.location_on), onTap: _loc, tileColor: Colors.blue[50], shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+        const Spacer(),
+        ElevatedButton(onPressed: () {
+          if(_lat != null && _phone.text.isNotEmpty) {
+             FirebaseFirestore.instance.collection('requests').add({
+               'service': widget.title, 'price': widget.price, 'phone': _phone.text, 
+               'lat': _lat, 'lng': _lng, 'status': 'pending', 
+               'timestamp': FieldValue.serverTimestamp(),
+               'patient_id': FirebaseAuth.instance.currentUser?.uid // هام جداً للمتابعة
+             });
+             Navigator.pop(context);
+             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الإرسال، تابع حالته في 'طلباتي'"), backgroundColor: Colors.green));
+          }
+        }, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF009688)), child: const Text("تأكيد الطلب", style: TextStyle(color: Colors.white)))
+      ])),
+    );
+  }
+}
+
+// 5. لوحة الممرض (تابات: جديد / مهامي)
+class NurseDashboard extends StatelessWidget {
+  const NurseDashboard({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("لوحة الممرض"),
+          bottom: const TabBar(tabs: [Tab(text: "طلبات متاحة"), Tab(text: "مهامي الحالية")]),
         ),
+        body: const TabBarView(children: [NurseMarket(), NurseMyTasks()]),
       ),
     );
   }
 }
 
-// 7. لوحة الممرض (المتطورة)
-class NurseScreen extends StatelessWidget {
-  const NurseScreen({super.key});
-
-  Future<void> _makePhoneCall(String phoneNumber) async {
-    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
-    if (!await launchUrl(launchUri)) {
-      throw Exception('Could not launch $launchUri');
-    }
-  }
-
-  Future<void> _openMap(double lat, double lng) async {
-    final Uri googleMapsUrl = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng");
-    if (!await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication)) {
-       throw Exception('Could not launch map');
-    }
-  }
-
+// التاب الأول: الطلبات الجديدة (تختفي بمجرد القبول)
+class NurseMarket extends StatelessWidget {
+  const NurseMarket({super.key});
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(title: const Text("طلبات المرضى القريبة"), centerTitle: true),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('requests').orderBy('timestamp', descending: true).snapshots(),
-        builder: (context, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-          if (snap.data!.docs.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.assignment_turned_in, size: 60, color: Colors.grey), SizedBox(height: 10), Text("لا توجد طلبات جديدة")]));
-          
-          return ListView.builder(
-            padding: const EdgeInsets.all(15),
-            itemCount: snap.data!.docs.length,
-            itemBuilder: (context, index) {
-              var data = snap.data!.docs[index].data() as Map<String, dynamic>;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 15),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5))]),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(children: [
-                            const CircleAvatar(backgroundColor: Color(0xFFE0F2F1), child: Icon(Icons.person, color: Color(0xFF009688))),
-                            const SizedBox(width: 10),
-                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(data['service'] ?? "خدمة", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                              Text("السعر: ${data['price']}", style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-                            ]),
-                          ]),
-                          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.orange[50], borderRadius: BorderRadius.circular(10)), child: const Text("جديد", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12))),
-                        ],
-                      ),
-                      const Divider(height: 25),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _makePhoneCall(data['phone']),
-                              icon: const Icon(Icons.call, size: 18),
-                              label: const Text("اتصال"),
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _openMap(data['lat'], data['lng']),
-                              icon: const Icon(Icons.location_on, size: 18),
-                              label: const Text("الخريطة"),
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2196F3), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                            ),
-                          ),
-                        ],
-                      )
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+    return StreamBuilder<QuerySnapshot>(
+      // نجلب فقط الطلبات المعلقة pending
+      stream: FirebaseFirestore.instance.collection('requests').where('status', isEqualTo: 'pending').orderBy('timestamp', descending: true).snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (snap.data!.docs.isEmpty) return const Center(child: Text("لا توجد طلبات جديدة"));
+        return ListView(padding: const EdgeInsets.all(10), children: snap.data!.docs.map((d) {
+           var data = d.data() as Map<String, dynamic>;
+           return Card(
+             child: ListTile(
+               leading: const CircleAvatar(child: Icon(Icons.person)),
+               title: Text(data['service']),
+               subtitle: Text(data['price']),
+               trailing: ElevatedButton(
+                 onPressed: () {
+                   // عند القبول: نغير الحالة ونضع اسم الممرض
+                   d.reference.update({
+                     'status': 'accepted', 
+                     'nurse_id': FirebaseAuth.instance.currentUser?.uid
+                   });
+                 }, 
+                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF009688)),
+                 child: const Text("قبول", style: TextStyle(color: Colors.white))
+               ),
+             ),
+           );
+        }).toList());
+      },
+    );
+  }
+}
+
+// التاب الثاني: مهام الممرض (التي قبلها)
+class NurseMyTasks extends StatelessWidget {
+  const NurseMyTasks({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return StreamBuilder<QuerySnapshot>(
+      // نجلب الطلبات التي قبلها هذا الممرض تحديداً
+      stream: FirebaseFirestore.instance.collection('requests').where('nurse_id', isEqualTo: uid).where('status', isEqualTo: 'accepted').snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (snap.data!.docs.isEmpty) return const Center(child: Text("ليس لديك مهام جارية"));
+        return ListView(padding: const EdgeInsets.all(10), children: snap.data!.docs.map((d) {
+           var data = d.data() as Map<String, dynamic>;
+           return Card(
+             color: Colors.blue[50],
+             child: Column(
+               children: [
+                 ListTile(title: Text(data['service']), subtitle: Text("الهاتف: ${data['phone']}"), trailing: Text(data['price'])),
+                 Row(
+                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                   children: [
+                     ElevatedButton.icon(onPressed: () => launchUrl(Uri.parse("tel:${data['phone']}")), icon: const Icon(Icons.call), label: const Text("اتصال")),
+                     ElevatedButton.icon(onPressed: () => launchUrl(Uri.parse("https://www.google.com/maps/search/?api=1&query=${data['lat']},${data['lng']}")), icon: const Icon(Icons.map), label: const Text("الخريطة")),
+                   ],
+                 ),
+                 const SizedBox(height: 10),
+                 const Text("انتظر تأكيد المريض عند النهاية", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                 const SizedBox(height: 10),
+               ],
+             ),
+           );
+        }).toList());
+      },
     );
   }
 }
