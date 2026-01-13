@@ -6,7 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart'; // مكتبة الصور
+import 'package:image_picker/image_picker.dart';
+import 'dart:io'; // مكتبة لفحص الإنترنت
 
 // إعدادات فايربيس
 const FirebaseOptions firebaseOptions = FirebaseOptions(
@@ -74,26 +75,69 @@ class AfyaApp extends StatelessWidget {
   }
 }
 
-// 1. شاشة البداية
+// 1. شاشة البداية (مع فحص الإنترنت)
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 class _SplashScreenState extends State<SplashScreen> {
+  bool _hasInternet = true;
+  bool _checking = true;
+
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(seconds: 3), () {
-      if (FirebaseAuth.instance.currentUser != null) {
-         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const WelcomeScreen()));
-      } else {
-         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-      }
-    });
+    _checkInternetAndProceed();
   }
+
+  // دالة فحص الإنترنت
+  Future<void> _checkInternetAndProceed() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        // يوجد إنترنت -> أكمل المؤقت
+        Timer(const Duration(seconds: 3), () {
+          if (FirebaseAuth.instance.currentUser != null) {
+             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const WelcomeScreen()));
+          } else {
+             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+          }
+        });
+      }
+    } on SocketException catch (_) {
+      // لا يوجد إنترنت
+      if(mounted) setState(() { _hasInternet = false; _checking = false; });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!_hasInternet) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.wifi_off, size: 100, color: Colors.red),
+              const SizedBox(height: 20),
+              const Text("لا يوجد اتصال بالإنترنت", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              const Text("يرجى التحقق من اتصالك والمحاولة مجدداً", style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 30),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() { _checking = true; _hasInternet = true; });
+                  _checkInternetAndProceed();
+                }, 
+                child: const Text("إعادة المحاولة")
+              )
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -114,7 +158,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// 2. شاشة الدخول والتسجيل
+// 2. شاشة الدخول
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -335,7 +379,7 @@ class NurseAuthGate extends StatelessWidget {
   );
 }
 
-// *** 1. استمارة تسجيل الممرض (إصلاح الاختفاء + تفعيل الرفع) ***
+// *** 1. استمارة تسجيل الممرض (مع مؤشر التحميل) ***
 class NurseRegistrationForm extends StatefulWidget {
   const NurseRegistrationForm({super.key});
   @override
@@ -346,10 +390,12 @@ class _NurseRegistrationFormState extends State<NurseRegistrationForm> {
   final _specialty = TextEditingController();
   final _address = TextEditingController();
   bool _hasCar = false;
-  // متغيرات لتتبع حالة الرفع
   bool _picUploaded = false;
   bool _idUploaded = false;
   bool _diplomaUploaded = false;
+  
+  // متغير جديد للتحميل
+  bool _isSubmitting = false;
 
   Future<void> _pickImage(String type) async {
     final ImagePicker picker = ImagePicker();
@@ -364,12 +410,16 @@ class _NurseRegistrationFormState extends State<NurseRegistrationForm> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_phone.text.isEmpty || _specialty.text.isEmpty || !_picUploaded) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى ملء البيانات ورفع الصور"), backgroundColor: Colors.red));
       return;
     }
-    FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser?.uid).update({
+    
+    // تفعيل حالة التحميل
+    setState(() => _isSubmitting = true);
+
+    await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser?.uid).update({
       'role': 'nurse',
       'status': 'pending_docs',
       'phone': _phone.text,
@@ -378,13 +428,14 @@ class _NurseRegistrationFormState extends State<NurseRegistrationForm> {
       'has_car': _hasCar,
       'docs_uploaded': true 
     });
+    
+    // ملاحظة: لا حاجة لإرجاع _isSubmitting = false لأن الشاشة ستتغير تلقائياً
   }
 
   @override
   Widget build(BuildContext context) {
-    // إصلاح الاختفاء: إضافة padding في الأسفل
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(25, 25, 25, 100), // 100 بكسل فراغ في الأسفل
+      padding: const EdgeInsets.fromLTRB(25, 25, 25, 100), 
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -403,13 +454,20 @@ class _NurseRegistrationFormState extends State<NurseRegistrationForm> {
           const Text("الوثائق المطلوبة (صور)", style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           
-          // أزرار الرفع تعمل الآن
           _uploadBtn("صورة شخصية", _picUploaded, () => _pickImage('pic')),
           _uploadBtn("بطاقة التعريف", _idUploaded, () => _pickImage('id')),
           _uploadBtn("صورة الدبلوم", _diplomaUploaded, () => _pickImage('diploma')),
           
           const SizedBox(height: 30),
-          ElevatedButton(onPressed: _submit, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55)), child: const Text("إرسال الطلب للمراجعة"))
+          
+          // الزر المعدل مع مؤشر التحميل
+          ElevatedButton(
+            onPressed: _isSubmitting ? null : _submit, // تعطيل الزر أثناء التحميل
+            style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55)), 
+            child: _isSubmitting 
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+              : const Text("إرسال الطلب للمراجعة")
+          )
         ],
       ),
     );
@@ -494,13 +552,13 @@ class _NursePaymentScreenState extends State<NursePaymentScreen> {
   );
 }
 
-// *** لوحة الإدارة (إضافة قسم الأسعار) ***
+// *** لوحة الإدارة ***
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3, // زدنا تبويب جديد
+      length: 3, 
       child: Scaffold(
         appBar: AppBar(title: const Text("الإدارة"), backgroundColor: Colors.red[50], bottom: const TabBar(isScrollable: true, tabs: [Tab(text: "توثيق الحسابات"), Tab(text: "مراجعة الدفع"), Tab(text: "تغيير الأسعار")])),
         body: const TabBarView(children: [AdminDocsReview(), AdminPaymentReview(), AdminPricesControl()]),
@@ -509,7 +567,6 @@ class AdminDashboard extends StatelessWidget {
   }
 }
 
-// قسم تغيير الأسعار في الأدمن
 class AdminPricesControl extends StatefulWidget {
   const AdminPricesControl({super.key});
   @override
@@ -531,7 +588,6 @@ class _AdminPricesControlState extends State<AdminPricesControl> {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var data = snap.data!.data() as Map<String, dynamic>? ?? {};
 
-        // تحديث القيم الحالية
         if (_controllers['حقن']!.text.isEmpty) _controllers['حقن']!.text = data['حقن'] ?? '800';
         if (_controllers['سيروم']!.text.isEmpty) _controllers['سيروم']!.text = data['سيروم'] ?? '2500';
         if (_controllers['تغيير ضماد']!.text.isEmpty) _controllers['تغيير ضماد']!.text = data['تغيير ضماد'] ?? '1200';
@@ -621,7 +677,7 @@ class AdminPaymentReview extends StatelessWidget {
   }
 }
 
-// 4. واجهة المريض (الأسعار الآن تأتي من الأدمن)
+// 4. واجهة المريض
 class PatientHomeScreen extends StatelessWidget {
   const PatientHomeScreen({super.key});
   @override
@@ -637,11 +693,10 @@ class PatientNewOrder extends StatelessWidget {
   const PatientNewOrder({super.key});
   @override
   Widget build(BuildContext context) {
-    // جلب الأسعار من قاعدة البيانات
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance.collection('config').doc('prices').snapshots(),
       builder: (context, snap) {
-        var p = snap.data?.data() as Map<String, dynamic>? ?? {}; // الأسعار
+        var p = snap.data?.data() as Map<String, dynamic>? ?? {}; 
         
         return GridView.count(crossAxisCount: 2, padding: const EdgeInsets.all(20), crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.9, children: [
           _item(context, "حقن", "${p['حقن'] ?? '800'} دج", Icons.vaccines, Colors.orange),
@@ -662,21 +717,33 @@ class PatientNewOrder extends StatelessWidget {
   Widget _item(BuildContext context, String t, String p, IconData i, Color c) => InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderScreen(title: t, price: p))), child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)]), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: c.withOpacity(0.1), shape: BoxShape.circle), child: Icon(i, size: 32, color: c)), const SizedBox(height: 15), Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)), const SizedBox(height: 5), Text(p, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))])));
 }
 
+// *** إصلاح قائمة المريض (Client-side Sorting) ***
 class PatientMyOrders extends StatelessWidget {
   const PatientMyOrders({super.key});
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('requests').where('patient_id', isEqualTo: uid).orderBy('timestamp', descending: true).snapshots(),
+      // أزلنا orderBy لحل مشكلة الفهرسة
+      stream: FirebaseFirestore.instance.collection('requests').where('patient_id', isEqualTo: uid).snapshots(),
       builder: (context, snap) {
         if (!snap.hasData || snap.data!.docs.isEmpty) return const Center(child: Text("لا توجد طلبات سابقة"));
-        return ListView(padding: const EdgeInsets.all(15), children: snap.data!.docs.map((d) {
+        
+        // نقوم بالترتيب هنا في الهاتف بدلاً من السيرفر
+        var docs = snap.data!.docs;
+        docs.sort((a, b) {
+           var t1 = a['timestamp'] as Timestamp?;
+           var t2 = b['timestamp'] as Timestamp?;
+           if (t1 == null || t2 == null) return 0;
+           return t2.compareTo(t1); // الأحدث أولاً
+        });
+
+        return ListView(padding: const EdgeInsets.all(15), children: docs.map((d) {
           var data = d.data() as Map<String, dynamic>;
           String status = data['status'] ?? 'pending';
           
           if (status == 'pending') {
-            return Card(color: Colors.orange[50], child: ListTile(title: Text(data['service']), subtitle: const Text("جارٍ البحث عن ممرض..."), leading: const CircularProgressIndicator(), trailing: IconButton(icon: const Icon(Icons.cancel, color: Colors.red), onPressed: ()=> d.reference.delete()))); // زر إلغاء للمريض
+            return Card(color: Colors.orange[50], child: ListTile(title: Text(data['service']), subtitle: const Text("جارٍ البحث عن ممرض..."), leading: const CircularProgressIndicator(), trailing: IconButton(icon: const Icon(Icons.cancel, color: Colors.red), onPressed: ()=> d.reference.delete())));
           } else {
             String nurseName = data['nurse_name'] ?? "ممرض";
             bool isCompleted = status == 'completed';
@@ -691,7 +758,6 @@ class PatientMyOrders extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isCompleted ? "اكتملت الخدمة" : "الممرض $nurseName قادم", style: const TextStyle(fontWeight: FontWeight.bold)), Text(data['service'])])),
                     ]),
-                    // زر للمريض لإنهاء الطلب أيضاً إذا نسي الممرض
                     if (!isCompleted) 
                       TextButton.icon(
                         onPressed: () => d.reference.update({'status': 'completed'}), 
@@ -739,7 +805,7 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 }
 
-// 6. لوحة الممرض (مع زر إنهاء المهمة)
+// 6. لوحة الممرض
 class NurseDashboard extends StatelessWidget {
   const NurseDashboard({super.key});
   @override
