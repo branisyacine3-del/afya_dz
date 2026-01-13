@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
-import 'package:intl/intl.dart' as intl;
+import 'package:flutter/services.dart'; // للنسخ
 
 // إعدادات فايربيس
 const FirebaseOptions firebaseOptions = FirebaseOptions(
@@ -113,7 +113,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// 2. شاشة الدخول
+// 2. شاشة الدخول والتسجيل
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -140,7 +140,14 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _doRegister() async {
     setState(() => _loading = true);
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(email: _email.text.trim(), password: _pass.text.trim());
+      UserCredential uc = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: _email.text.trim(), password: _pass.text.trim());
+      // تسجيل المستخدم مبدئياً كمريض، الممرض يغير حالته لاحقاً
+      await FirebaseFirestore.instance.collection('users').doc(uc.user!.uid).set({
+        'email': _email.text.trim(),
+        'role': 'user', 
+        'status': 'active', // المريض نشط دائماً
+        'name': 'مستخدم جديد'
+      });
       if(mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const NameInputScreen()));
     } catch (e) {
       _showError("البريد مستخدم أو كلمة المرور ضعيفة");
@@ -187,7 +194,9 @@ class _NameInputScreenState extends State<NameInputScreen> {
   final _nameController = TextEditingController();
   Future<void> _saveName() async {
     if (_nameController.text.isEmpty) return;
-    await FirebaseAuth.instance.currentUser?.updateDisplayName(_nameController.text);
+    User? user = FirebaseAuth.instance.currentUser;
+    await user?.updateDisplayName(_nameController.text);
+    await FirebaseFirestore.instance.collection('users').doc(user!.uid).update({'name': _nameController.text});
     if(mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const WelcomeScreen()));
   }
   @override
@@ -211,6 +220,8 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    bool isAdmin = user?.email == "admin@afya.dz"; // البريد السري للمدير
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("عافية"), 
@@ -233,10 +244,24 @@ class WelcomeScreen extends StatelessWidget {
                 ]),
               ]),
             ),
-            const SizedBox(height: 50),
+            const SizedBox(height: 40),
+            
+            if (isAdmin) 
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboard())),
+                  icon: const Icon(Icons.admin_panel_settings, color: Colors.white),
+                  label: const Text("لوحة الإدارة (Admin)", style: TextStyle(color: Colors.white, fontSize: 18)),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red[800]),
+                ),
+              ),
+
             _mainBtn(context, "أنا مريض", "أطلب خدمة طبية الآن", Icons.medical_services_outlined, const Color(0xFF00897B), const PatientHomeScreen()),
             const SizedBox(height: 20),
-            _mainBtn(context, "أنا ممرض", "لوحة التحكم والطلبات", Icons.assignment_ind_outlined, const Color(0xFF039BE5), const NurseDashboard()),
+            // بوابة الممرض (نقطة التفتيش)
+            _mainBtn(context, "أنا ممرض", "لوحة التحكم والطلبات", Icons.assignment_ind_outlined, const Color(0xFF039BE5), const NurseAuthGate()),
           ],
         ),
       ),
@@ -259,7 +284,244 @@ class WelcomeScreen extends StatelessWidget {
   );
 }
 
-// 4. واجهة المريض
+// *** بوابة الممرض الأمنية (Nurse Gate) ***
+class NurseAuthGate extends StatelessWidget {
+  const NurseAuthGate({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return Scaffold(
+      appBar: AppBar(title: const Text("التحقق من الممرض")),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+        builder: (context, snap) {
+          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          
+          var data = snap.data!.data() as Map<String, dynamic>?;
+          // الحالة الافتراضية إذا لم يكن مسجلاً كممرض
+          String status = data != null && data.containsKey('status') ? data['status'] : 'user';
+          String role = data != null && data.containsKey('role') ? data['role'] : 'user';
+
+          // 1. إذا كان مستخدماً عادياً، نرسله لصفحة التسجيل كممرض
+          if (role == 'user') {
+            return const NurseRegistrationForm();
+          }
+
+          // 2. إذا كان ممرضاً، نفحص حالته
+          if (status == 'pending_docs') {
+            return _statusScreen(Icons.hourglass_top, Colors.orange, "وثائقك قيد المراجعة", "يقوم المدير ياسين بمراجعة ملفك حالياً.");
+          } else if (status == 'pending_payment') {
+            return const NursePaymentScreen(); // حان وقت الدفع
+          } else if (status == 'payment_review') {
+             return _statusScreen(Icons.payments, Colors.blue, "جاري التحقق من الدفع", "شكراً لك. سيتم تفعيل حسابك فور تأكيد استلام المبلغ.");
+          } else if (status == 'approved') {
+            return const NurseDashboard(); // مبروك! الباب مفتوح
+          } else {
+            return const NurseRegistrationForm();
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _statusScreen(IconData i, Color c, String t, String s) => Padding(
+    padding: const EdgeInsets.all(30),
+    child: Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(i, size: 80, color: c),
+          const SizedBox(height: 20),
+          Text(t, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          Text(s, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+        ],
+      ),
+    ),
+  );
+}
+
+// *** 1. استمارة تسجيل الممرض (الوثائق) ***
+class NurseRegistrationForm extends StatefulWidget {
+  const NurseRegistrationForm({super.key});
+  @override
+  State<NurseRegistrationForm> createState() => _NurseRegistrationFormState();
+}
+class _NurseRegistrationFormState extends State<NurseRegistrationForm> {
+  final _phone = TextEditingController();
+  final _specialty = TextEditingController();
+  final _address = TextEditingController();
+  bool _hasCar = false;
+
+  void _submit() {
+    if (_phone.text.isEmpty || _specialty.text.isEmpty) return;
+    // هنا يتم محاكاة رفع الوثائق وتغيير الحالة
+    FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser?.uid).update({
+      'role': 'nurse',
+      'status': 'pending_docs', // ننتظر موافقة الآدمن
+      'phone': _phone.text,
+      'specialty': _specialty.text,
+      'address': _address.text,
+      'has_car': _hasCar,
+      'docs_uploaded': true // إشارة للمدير
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(25),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("تسجيل ممرض جديد", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF00897B))),
+          const SizedBox(height: 10),
+          const Text("للانضمام لفريق عافية، يرجى ملء البيانات بدقة ورفع الوثائق.", style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 30),
+          TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "رقم الهاتف", prefixIcon: Icon(Icons.phone), border: OutlineInputBorder())),
+          const SizedBox(height: 15),
+          TextField(controller: _specialty, decoration: const InputDecoration(labelText: "التخصص (مثال: ممرض دولة، تخدير...)", prefixIcon: Icon(Icons.badge), border: OutlineInputBorder())),
+          const SizedBox(height: 15),
+          TextField(controller: _address, decoration: const InputDecoration(labelText: "العنوان (الولاية والبلدية)", prefixIcon: Icon(Icons.map), border: OutlineInputBorder())),
+          const SizedBox(height: 15),
+          SwitchListTile(title: const Text("هل تمتلك سيارة للتنقل؟"), value: _hasCar, onChanged: (v) => setState(() => _hasCar = v)),
+          const SizedBox(height: 30),
+          const Text("الوثائق المطلوبة (صور)", style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          _uploadBtn("صورة شخصية"),
+          _uploadBtn("بطاقة التعريف"),
+          _uploadBtn("صورة الدبلوم"),
+          const SizedBox(height: 30),
+          ElevatedButton(onPressed: _submit, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55)), child: const Text("إرسال الطلب للمراجعة"))
+        ],
+      ),
+    );
+  }
+  Widget _uploadBtn(String t) => Container(margin: const EdgeInsets.only(bottom: 10), child: OutlinedButton.icon(onPressed: (){}, icon: const Icon(Icons.upload_file), label: Text("رفع $t (اضغط هنا)")));
+}
+
+// *** 2. شاشة الدفع (CCP & RIP) ***
+class NursePaymentScreen extends StatelessWidget {
+  const NursePaymentScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const Icon(Icons.monetization_on, size: 80, color: Colors.green),
+          const SizedBox(height: 20),
+          const Text("تفعيل الحساب", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          const Text("تم قبول وثائقك بنجاح! ✅\nللبدء في العمل، يرجى دفع اشتراك الشهر الأول.", textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
+          const SizedBox(height: 30),
+          Card(
+            color: Colors.yellow[50],
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  const Text("مبلغ الاشتراك الشهري", style: TextStyle(color: Colors.grey)),
+                  const Text("3500 دج", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.green)),
+                  const Text("+ 3 أيام مجانية كهدية ترحيبية 🎁", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                  const Divider(),
+                  _rowCopy("CCP", "0028939081"),
+                  _rowCopy("Clé", "97"),
+                  _rowCopy("الاسم", "Branis Yacine"),
+                  const Divider(),
+                  _rowCopy("RIP", "00799999002893908197"),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 30),
+          ElevatedButton.icon(
+            onPressed: () {
+              // محاكاة رفع الوصل
+              FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser?.uid).update({
+                'status': 'payment_review', // ننتظر تأكيد الدفع
+              });
+            },
+            icon: const Icon(Icons.camera_alt),
+            label: const Text("رفع صورة وصل الدفع"),
+            style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55)),
+          )
+        ],
+      ),
+    );
+  }
+  Widget _rowCopy(String l, String v) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(l, style: const TextStyle(fontWeight: FontWeight.bold)), Row(children: [Text(v, style: const TextStyle(fontFamily: 'monospace')), IconButton(icon: const Icon(Icons.copy, size: 15), onPressed: () => Clipboard.setData(ClipboardData(text: v)))])]),
+  );
+}
+
+// *** لوحة الإدارة (Admin) المطورة ***
+class AdminDashboard extends StatelessWidget {
+  const AdminDashboard({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(title: const Text("الإدارة"), backgroundColor: Colors.red[50], bottom: const TabBar(tabs: [Tab(text: "توثيق الحسابات"), Tab(text: "مراجعة الدفع")])),
+        body: const TabBarView(children: [AdminDocsReview(), AdminPaymentReview()]),
+      ),
+    );
+  }
+}
+
+class AdminDocsReview extends StatelessWidget {
+  const AdminDocsReview({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').where('status', isEqualTo: 'pending_docs').snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData || snap.data!.docs.isEmpty) return const Center(child: Text("لا توجد ملفات للمراجعة"));
+        return ListView(padding: const EdgeInsets.all(10), children: snap.data!.docs.map((d) {
+          var data = d.data() as Map<String, dynamic>;
+          return Card(child: ListTile(
+            title: Text(data['name'] ?? "ممرض"),
+            subtitle: Text("${data['specialty']} - ${data['phone']}"),
+            trailing: ElevatedButton(
+              onPressed: () => d.reference.update({'status': 'pending_payment'}), // قبول الوثائق -> اذهب للدفع
+              child: const Text("قبول الوثائق"),
+            ),
+          ));
+        }).toList());
+      },
+    );
+  }
+}
+
+class AdminPaymentReview extends StatelessWidget {
+  const AdminPaymentReview({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').where('status', isEqualTo: 'payment_review').snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData || snap.data!.docs.isEmpty) return const Center(child: Text("لا توجد مدفوعات للمراجعة"));
+        return ListView(padding: const EdgeInsets.all(10), children: snap.data!.docs.map((d) {
+          var data = d.data() as Map<String, dynamic>;
+          return Card(child: ListTile(
+            leading: const Icon(Icons.attach_money, color: Colors.green),
+            title: Text(data['name'] ?? "ممرض"),
+            subtitle: const Text("أرسل وصل الدفع"),
+            trailing: ElevatedButton(
+              onPressed: () => d.reference.update({'status': 'approved'}), // تفعيل نهائي!
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text("تفعيل الحساب"),
+            ),
+          ));
+        }).toList());
+      },
+    );
+  }
+}
+
+// 4. واجهة المريض (كما هي)
 class PatientHomeScreen extends StatelessWidget {
   const PatientHomeScreen({super.key});
   @override
@@ -280,44 +542,18 @@ class PatientNewOrder extends StatelessWidget {
       _item(context, "سيروم", "2500 دج", Icons.water_drop, Colors.blue),
       _item(context, "تغيير ضماد", "1200 دج", Icons.healing, Colors.purple),
       _item(context, "قياس ضغط", "500 دج", Icons.monitor_heart, Colors.red),
-      InkWell(
-        onTap: () => _custom(context), 
-        // هنا كان الخطأ، أصلحناه بجعل الإطار solid (متصل)
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white, 
-            borderRadius: BorderRadius.circular(20), 
-            border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid)
-          ), 
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_circle, size: 45, color: Colors.grey[400]), const SizedBox(height: 10), Text("طلب خدمة أخرى", style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold))])
-        )
-      ),
+      InkWell(onTap: () => _custom(context), child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade300)), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_circle, size: 45, color: Colors.grey[400]), const SizedBox(height: 10), Text("طلب خدمة أخرى", style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold))]))),
     ]);
   }
   
   void _custom(BuildContext context) {
     final c = TextEditingController();
-    showDialog(context: context, builder: (_) => AlertDialog(
-      title: const Text("اكتب طلبك هنا"), 
-      content: TextField(
-        controller: c, 
-        maxLines: 2,
-        decoration: const InputDecoration(
-          hintText: "مثال: أحتاج تغيير ضماد لمريض سكري، أو رعاية كبار السن...", 
-          border: OutlineInputBorder()
-        )
-      ), 
-      actions: [ElevatedButton(onPressed: () {Navigator.pop(context); if(c.text.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (_) => OrderScreen(title: c.text, price: "حسب الاتفاق")));}, child: const Text("متابعة"))]
-    ));
+    showDialog(context: context, builder: (_) => AlertDialog(title: const Text("اكتب طلبك"), content: TextField(controller: c, decoration: const InputDecoration(hintText: "مثال: تغيير ضماد...")), actions: [ElevatedButton(onPressed: () {Navigator.pop(context); if(c.text.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (_) => OrderScreen(title: c.text, price: "حسب الاتفاق")));}, child: const Text("متابعة"))]));
   }
   
-  Widget _item(BuildContext context, String t, String p, IconData i, Color c) => InkWell(
-    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderScreen(title: t, price: p))),
-    child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)]), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: c.withOpacity(0.1), shape: BoxShape.circle), child: Icon(i, size: 32, color: c)), const SizedBox(height: 15), Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)), const SizedBox(height: 5), Text(p, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))])),
-  );
+  Widget _item(BuildContext context, String t, String p, IconData i, Color c) => InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderScreen(title: t, price: p))), child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)]), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: c.withOpacity(0.1), shape: BoxShape.circle), child: Icon(i, size: 32, color: c)), const SizedBox(height: 15), Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)), const SizedBox(height: 5), Text(p, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))])));
 }
 
-// بطاقة متابعة الطلب للمريض
 class PatientMyOrders extends StatelessWidget {
   const PatientMyOrders({super.key});
   @override
@@ -330,41 +566,12 @@ class PatientMyOrders extends StatelessWidget {
         return ListView(padding: const EdgeInsets.all(15), children: snap.data!.docs.map((d) {
           var data = d.data() as Map<String, dynamic>;
           String status = data['status'] ?? 'pending';
-          
           if (status == 'pending') {
-            return Card(
-              color: Colors.orange[50],
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    const CircularProgressIndicator(color: Colors.orange),
-                    const SizedBox(height: 15),
-                    Text("جارٍ البحث عن ممرض...", style: TextStyle(color: Colors.orange[800], fontWeight: FontWeight.bold, fontSize: 18)),
-                    const SizedBox(height: 5),
-                    Text("طلبك لخدمة '${data['service']}' قيد النشر للممرضين القريبين منك", textAlign: TextAlign.center, style: TextStyle(color: Colors.orange[600])),
-                  ],
-                ),
-              ),
-            );
+            return Card(color: Colors.orange[50], child: Padding(padding: const EdgeInsets.all(20), child: Column(children: [const CircularProgressIndicator(color: Colors.orange), const SizedBox(height: 15), Text("جارٍ البحث عن ممرض...", style: TextStyle(color: Colors.orange[800], fontWeight: FontWeight.bold))])));
           } else {
             String nurseName = data['nurse_name'] ?? "ممرض";
             bool isCompleted = status == 'completed';
-            return Card(
-              color: isCompleted ? Colors.grey[100] : Colors.green[50],
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Icon(isCompleted ? Icons.check_circle : Icons.health_and_safety, size: 50, color: isCompleted ? Colors.grey : Colors.green),
-                    const SizedBox(height: 15),
-                    Text(isCompleted ? "تم إنجاز المهمة" : "الممرض $nurseName في الطريق!", style: TextStyle(color: isCompleted ? Colors.grey[700] : Colors.green[800], fontWeight: FontWeight.bold, fontSize: 18)),
-                    const SizedBox(height: 5),
-                    if (!isCompleted) Text("وافق الممرض $nurseName على طلبك وهو قادم لتقديم خدمة '${data['service']}'", textAlign: TextAlign.center, style: TextStyle(color: Colors.green[600])),
-                  ],
-                ),
-              ),
-            );
+            return Card(color: isCompleted ? Colors.grey[100] : Colors.green[50], child: Padding(padding: const EdgeInsets.all(20), child: Column(children: [Icon(isCompleted ? Icons.check_circle : Icons.health_and_safety, size: 50, color: isCompleted ? Colors.grey : Colors.green), const SizedBox(height: 15), Text(isCompleted ? "تم إنجاز المهمة" : "الممرض $nurseName قادم!", style: TextStyle(color: isCompleted ? Colors.grey[700] : Colors.green[800], fontWeight: FontWeight.bold))])));
           }
         }).toList());
       },
@@ -383,70 +590,26 @@ class _OrderScreenState extends State<OrderScreen> {
   final _phone = TextEditingController();
   double? _lat, _lng;
   bool _locSuccess = false;
-  bool _loading = false;
 
   Future<void> _loc() async {
-    setState(() => _loading = true);
     try {
       LocationPermission p = await Geolocator.checkPermission();
       if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
       Position pos = await Geolocator.getCurrentPosition();
-      setState(() { _lat = pos.latitude; _lng = pos.longitude; _locSuccess = true; _loading = false; });
-    } catch (e) { setState(() => _loading = false); }
+      setState(() { _lat = pos.latitude; _lng = pos.longitude; _locSuccess = true; });
+    } catch (e) { /* */ }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("تأكيد الطلب")),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Container(padding: const EdgeInsets.all(20), width: double.infinity, decoration: BoxDecoration(color: Colors.teal[50], borderRadius: BorderRadius.circular(15)), child: Column(children: [Text(widget.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal)), Text(widget.price, style: const TextStyle(fontSize: 18, color: Colors.green))])),
-            const SizedBox(height: 30),
-            TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: "رقم الهاتف للتواصل", prefixIcon: const Icon(Icons.phone), border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
-            const SizedBox(height: 20),
-            InkWell(
-              onTap: _loc,
-              child: Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(color: _locSuccess ? Colors.green[50] : Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: _locSuccess ? Colors.green : Colors.grey.shade300)),
-                child: Row(children: [
-                  _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(Icons.location_on, color: _locSuccess ? Colors.green : Colors.grey),
-                  const SizedBox(width: 15),
-                  Expanded(child: Text(_locSuccess ? "تم تحديد موقعك بنجاح" : "اضغط هنا لتحديد موقع المنزل", style: TextStyle(color: _locSuccess ? Colors.green : Colors.black87))),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: () {
-                if(_lat != null && _phone.text.isNotEmpty) {
-                   FirebaseFirestore.instance.collection('requests').add({
-                     'service': widget.title, 'price': widget.price, 'phone': _phone.text, 
-                     'lat': _lat, 'lng': _lng, 'status': 'pending', 
-                     'timestamp': FieldValue.serverTimestamp(),
-                     'patient_id': FirebaseAuth.instance.currentUser?.uid,
-                     'patient_name': FirebaseAuth.instance.currentUser?.displayName ?? 'مريض',
-                   });
-                   Navigator.pop(context);
-                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم إرسال الطلب للممرضين"), backgroundColor: Colors.green));
-                } else {
-                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى إدخال الرقم والموقع"), backgroundColor: Colors.red));
-                }
-              },
-              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60)),
-              child: const Text("تأكيد الطلب", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            )
-          ],
-        ),
-      ),
+      body: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(children: [Container(padding: const EdgeInsets.all(20), width: double.infinity, decoration: BoxDecoration(color: Colors.teal[50], borderRadius: BorderRadius.circular(15)), child: Column(children: [Text(widget.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal)), Text(widget.price, style: const TextStyle(fontSize: 18, color: Colors.green))])), const SizedBox(height: 30), TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "رقم الهاتف", prefixIcon: Icon(Icons.phone), border: OutlineInputBorder())), const SizedBox(height: 20), InkWell(onTap: _loc, child: Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: _locSuccess ? Colors.green[50] : Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: _locSuccess ? Colors.green : Colors.grey.shade300)), child: Row(children: [Icon(Icons.location_on, color: _locSuccess ? Colors.green : Colors.grey), const SizedBox(width: 15), Expanded(child: Text(_locSuccess ? "تم تحديد الموقع" : "اضغط لتحديد الموقع"))]))), const SizedBox(height: 40), ElevatedButton(onPressed: () { if(_lat != null && _phone.text.isNotEmpty) { FirebaseFirestore.instance.collection('requests').add({'service': widget.title, 'price': widget.price, 'phone': _phone.text, 'lat': _lat, 'lng': _lng, 'status': 'pending', 'timestamp': FieldValue.serverTimestamp(), 'patient_id': FirebaseAuth.instance.currentUser?.uid, 'patient_name': FirebaseAuth.instance.currentUser?.displayName ?? 'مريض'}); Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الإرسال"), backgroundColor: Colors.green)); } }, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60)), child: const Text("تأكيد الطلب"))])),
     );
   }
 }
 
-// 6. لوحة الممرض
+// 6. لوحة الممرض (النهائية)
 class NurseDashboard extends StatelessWidget {
   const NurseDashboard({super.key});
   @override
@@ -465,58 +628,12 @@ class NurseMarket extends StatelessWidget {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('requests').where('status', isEqualTo: 'pending').snapshots(),
       builder: (context, snap) {
-        if (snap.hasData && snap.data!.docs.isNotEmpty) {
-          return ListView.builder(
-            padding: const EdgeInsets.all(15),
-            itemCount: snap.data!.docs.length,
-            itemBuilder: (context, index) {
-              var d = snap.data!.docs[index];
-              var data = d.data() as Map<String, dynamic>;
-              String patientName = data['patient_name'] ?? 'مريض';
-              
-              return Card(
-                margin: const EdgeInsets.only(bottom: 15),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const CircleAvatar(backgroundColor: Color(0xFFE0F2F1), child: Icon(Icons.person, color: Color(0xFF00897B))),
-                          const SizedBox(width: 12),
-                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(patientName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            Text("يحتاج: ${data['service']}", style: TextStyle(color: Colors.grey[700])),
-                          ])),
-                          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.orange[50], borderRadius: BorderRadius.circular(20)), child: const Text("جديد", style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold))),
-                        ],
-                      ),
-                      const SizedBox(height: 15),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(data['price'], style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
-                          ElevatedButton(
-                            onPressed: () => d.reference.update({
-                              'status': 'accepted', 
-                              'nurse_id': FirebaseAuth.instance.currentUser?.uid,
-                              'nurse_name': FirebaseAuth.instance.currentUser?.displayName ?? 'ممرض' 
-                            }),
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00897B), padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10)),
-                            child: const Text("قبول الطلب"),
-                          ),
-                        ],
-                      )
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        }
-        if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        return const Center(child: Text("لا توجد طلبات جديدة حالياً"));
+        if (!snap.hasData || snap.data!.docs.isEmpty) return const Center(child: Text("لا توجد طلبات جديدة حالياً"));
+        return ListView.builder(padding: const EdgeInsets.all(15), itemCount: snap.data!.docs.length, itemBuilder: (context, index) {
+          var d = snap.data!.docs[index];
+          var data = d.data() as Map<String, dynamic>;
+          return Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [Row(children: [const CircleAvatar(child: Icon(Icons.person)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(data['patient_name'] ?? 'مريض', style: const TextStyle(fontWeight: FontWeight.bold)), Text("يحتاج: ${data['service']}")] ))]), const SizedBox(height: 15), Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(data['price'], style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)), ElevatedButton(onPressed: () => d.reference.update({'status': 'accepted', 'nurse_id': FirebaseAuth.instance.currentUser?.uid, 'nurse_name': FirebaseAuth.instance.currentUser?.displayName}), child: const Text("قبول الطلب"))])])));
+        });
       },
     );
   }
@@ -530,48 +647,12 @@ class NurseMyTasks extends StatelessWidget {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('requests').where('nurse_id', isEqualTo: uid).where('status', isEqualTo: 'accepted').snapshots(),
       builder: (context, snap) {
-        if (snap.hasData && snap.data!.docs.isNotEmpty) {
-          return ListView.builder(
-            padding: const EdgeInsets.all(15),
-            itemCount: snap.data!.docs.length,
-            itemBuilder: (context, index) {
-              var d = snap.data!.docs[index];
-              var data = d.data() as Map<String, dynamic>;
-              String pName = data['patient_name'] ?? 'مريض';
-              
-              return Card(
-                margin: const EdgeInsets.only(bottom: 15),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        const Icon(Icons.assignment_ind, color: Color(0xFF00897B)),
-                        const SizedBox(width: 10),
-                        Text("المريض: $pName", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      ]),
-                      const SizedBox(height: 5),
-                      Text("الخدمة المطلوبة: ${data['service']}", style: const TextStyle(fontSize: 16)),
-                      const Divider(height: 30),
-                      Row(
-                        children: [
-                          Expanded(child: ElevatedButton.icon(onPressed: () => launchUrl(Uri.parse("tel:${data['phone']}")), icon: const Icon(Icons.phone), label: const Text("اتصال"), style: ElevatedButton.styleFrom(backgroundColor: Colors.green))),
-                          const SizedBox(width: 10),
-                          Expanded(child: ElevatedButton.icon(onPressed: () => launchUrl(Uri.parse("https://www.google.com/maps/search/?api=1&query=${data['lat']},${data['lng']}")), icon: const Icon(Icons.location_on), label: const Text("الموقع"), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1976D2)))),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Center(child: TextButton(onPressed: () => d.reference.update({'status': 'completed'}), child: const Text("اضغط هنا عند إتمام المهمة", style: TextStyle(color: Colors.grey))))
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        }
-        if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        return const Center(child: Text("ليس لديك مهام جارية"));
+        if (!snap.hasData || snap.data!.docs.isEmpty) return const Center(child: Text("ليس لديك مهام جارية"));
+        return ListView.builder(padding: const EdgeInsets.all(15), itemCount: snap.data!.docs.length, itemBuilder: (context, index) {
+          var d = snap.data!.docs[index];
+          var data = d.data() as Map<String, dynamic>;
+          return Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [Text("المريض: ${data['patient_name']}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const Divider(), Row(children: [Expanded(child: ElevatedButton.icon(onPressed: () => launchUrl(Uri.parse("tel:${data['phone']}")), icon: const Icon(Icons.phone), label: const Text("اتصال"))), const SizedBox(width: 10), Expanded(child: ElevatedButton.icon(onPressed: () => launchUrl(Uri.parse("https://www.google.com/maps/search/?api=1&query=${data['lat']},${data['lng']}")), icon: const Icon(Icons.location_on), label: const Text("الموقع")))]), TextButton(onPressed: () => d.reference.update({'status': 'completed'}), child: const Text("إنهاء المهمة"))])));
+        });
       },
     );
   }
