@@ -9,18 +9,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.2
-  firebase_core: ^2.15.0
-  firebase_auth: ^4.7.0
-  cloud_firestore: ^4.8.0
-  # هذه النسخ تعمل مع النظام الحالي بدون مشاكل
-  url_launcher: ^6.1.12
-  geolocator: ^9.0.2
+  cupertino_icons: 1.0.6
+  firebase_core: 2.24.2
+  firebase_auth: 4.15.3
+  cloud_firestore: 4.13.6
+  # استخدمنا نسخاً محددة بدون علامة ^ لمنع التحديث التلقائي المسبب للمشاكل
+  url_launcher: 6.2.5
+  geolocator: 11.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
+  flutter_lints: 3.0.0
 
 flutter:
   uses-material-design: true
