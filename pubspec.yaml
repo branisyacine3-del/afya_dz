@@ -32,5 +32,5 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "Picsart_26-01-13_14-44-32-327.jpg"
+  image_path: "Picsart_26-01-13_15-36-20-384.png"
   min_sdk_android: 21
