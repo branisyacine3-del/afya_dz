@@ -1,5 +1,5 @@
 name: Afya
-description: Healthcare app.
+description: The Ultimate Healthcare App.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,17 +9,29 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # المكتبات الأساسية
-  cupertino_icons: ^1.0.6
+    
+  # --- 1. أساسيات فايربيز (Firebase Core) ---
   firebase_core: ^2.27.0
   firebase_auth: ^4.17.8
   cloud_firestore: ^4.15.8
+  
+  # --- 2. الأدوات المساعدة (Utilities) ---
   url_launcher: ^6.2.5
-  geolocator: ^11.0.0
   intl: ^0.19.0
   image_picker: ^1.0.7
+  shared_preferences: ^2.2.2  # ⚠️ كانت ناقصة عندك
+  uuid: ^4.3.3                 # ⚠️ كانت ناقصة عندك
   
-  # ✅ الحل السحري: نقلنا مكتبة الأيقونات هنا لكي يراها "GitHub Actions" وتختفي رسالة الخطأ
+  # --- 3. التصميم والخرائط (UI & Maps - V10) ---
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.1.0         # ⚠️ كانت ناقصة (سبب خطأ الخطوط)
+  animate_do: ^3.3.2           # ⚠️ كانت ناقصة (سبب خطأ الأنيميشن)
+  flutter_map: ^6.1.0          # ⚠️ كانت ناقصة (سبب خطأ الخريطة)
+  latlong2: ^0.9.0             # ⚠️ كانت ناقصة
+  geolocator: ^11.0.0
+  geocoding: ^3.0.0            # ⚠️ كانت ناقصة
+  
+  # --- 4. أيقونة التطبيق ---
   flutter_launcher_icons: ^0.13.1
 
 dev_dependencies:
@@ -30,12 +42,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-# ==========================================
-# 🖼️ إعدادات أيقونة التطبيق (كما طلبت)
-# ==========================================
+# --- إعدادات الأيقونة ---
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  # ⚠️ تأكد أن هذا الملف موجود بجانب pubspec.yaml بنفس الاسم تماماً
   image_path: "Picsart_26-01-15_11-27-34-308.png"
   min_sdk_android: 21
