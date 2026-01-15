@@ -98,6 +98,9 @@ class AppColors {
   static const Color background = Color(0xFFF5F7FA);
   static const Color success = Color(0xFF00C853);
   static const Color error = Color(0xFFD50000);
+  
+  // ✅ هذا هو السطر الجديد الذي يجب إضافته
+  static const Color warning = Color(0xFFFFA000); 
 }
 
 // قائمة الولايات
