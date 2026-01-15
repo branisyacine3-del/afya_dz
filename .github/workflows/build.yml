@@ -19,9 +19,15 @@ jobs:
         with:
           flutter-version: '3.19.0'
       
-      - run: flutter create .
+      # ✅✅ التغيير الجوهري: إجبار السيرفر على تسمية التطبيق باسمك الخاص ✅✅
+      # سيتم إنشاء التطبيق بالاسم: com.yacine.afya
+      - run: flutter create --org com.yacine --project-name afya .
       
-      # 1. أوامر الإصلاح المعتادة
+      # ✅✅ وضع ملف فايربيز (جواز السفر) في مكانه ✅✅
+      - name: Create google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > android/app/google-services.json
+
+      # أوامر الإصلاح والتحسين
       - run: |
           sed -i 's/compileSdkVersion .*/compileSdkVersion 34/g' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 34/g' android/app/build.gradle
@@ -32,11 +38,9 @@ jobs:
           sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
 
       - run: flutter pub get
-      
-      # 2. أمر تركيب الأيقونة الجديدة
       - run: dart run flutter_launcher_icons
-
       - run: flutter build apk --release --no-tree-shake-icons
+      
       - uses: actions/upload-artifact@v4
         with:
           name: release-apk
