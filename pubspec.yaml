@@ -10,13 +10,21 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
+  
+  # Firebase Core Services
   firebase_core: ^2.27.0
   firebase_auth: ^4.17.8
   cloud_firestore: ^4.15.8
+  
+  # Utilities (أدوات مساعدة)
   url_launcher: ^6.2.5
-  geolocator: ^11.0.0
   intl: ^0.19.0
-  image_picker: ^1.0.7  # <--- الإضافة الجديدة (أداة الصور)
+  image_picker: ^1.0.7
+  
+  # Location & Maps (إضافات النسخة الإمبراطورية V8)
+  geolocator: ^11.0.0
+  geocoding: ^3.0.0        # لاكتشاف الولاية أوتوماتيكياً
+  google_maps_flutter: ^2.5.3  # لعرض خريطة التتبع المباشر
 
 dev_dependencies:
   flutter_test:
@@ -24,10 +32,11 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.13.1
 
+# إعدادات أيقونة التطبيق
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "Picsart_26-01-13_15-36-20-384.png"
+  image_path: "Picsart_26-01-13_15-36-20-384.png" # تأكد أن مسار الصورة صحيح كما كان عندك
   min_sdk_android: 21
 
 flutter:
