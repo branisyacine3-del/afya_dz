@@ -1,5 +1,5 @@
 name: Afya
-description: The Ultimate Healthcare App.
+description: Healthcare app.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,45 +9,33 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # --- Core ---
+  # المكتبات الأساسية
+  cupertino_icons: ^1.0.6
   firebase_core: ^2.27.0
   firebase_auth: ^4.17.8
   cloud_firestore: ^4.15.8
-  
-  # --- Utilities ---
   url_launcher: ^6.2.5
+  geolocator: ^11.0.0
   intl: ^0.19.0
   image_picker: ^1.0.7
-  shared_preferences: ^2.2.2  # لحفظ الإعدادات محلياً
-  uuid: ^4.3.3                 # لتوليد معرفات فريدة
   
-  # --- UI & Animations ---
-  cupertino_icons: ^1.0.6
-  google_fonts: ^6.1.0         # خطوط احترافية
-  animate_do: ^3.3.2           # مكتبة أنيميشن عالمية
-  
-  # --- Maps & Location ---
-  flutter_map: ^6.1.0          # خرائط مجانية
-  latlong2: ^0.9.0             # إحداثيات
-  geolocator: ^11.0.0          # تحديد الموقع
-  geocoding: ^3.0.0            # معرفة اسم الولاية
+  # ✅ الحل السحري: نقلنا مكتبة الأيقونات هنا لكي يراها "GitHub Actions" وتختفي رسالة الخطأ
+  flutter_launcher_icons: ^0.13.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  # ✅ تمت إضافة مكتبة صناعة الأيقونات
-  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
 
 # ==========================================
-# 🖼️ إعدادات أيقونة التطبيق (App Icon Config)
+# 🖼️ إعدادات أيقونة التطبيق (كما طلبت)
 # ==========================================
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  # ⚠️ تأكد أن الصورة موجودة بجانب ملف pubspec.yaml تماماً
-  image_path: Picsart_26-01-15_11-27-34-308.png"
+  # ⚠️ تأكد أن هذا الملف موجود بجانب pubspec.yaml بنفس الاسم تماماً
+  image_path: "Picsart_26-01-15_11-27-34-308.png"
   min_sdk_android: 21
