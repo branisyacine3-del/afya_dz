@@ -8,10 +8,10 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // ✅ للإشعارات
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // ✅ للإشعارات المحلية
-import 'package:connectivity_plus/connectivity_plus.dart'; // ✅ لمراقبة الإنترنت
-import 'package:http/http.dart' as http; // ✅ لإرسال الإشعارات
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:image_picker/image_picker.dart';
@@ -25,42 +25,62 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
 // ============================================================================
-// 🚀 PART 1: INFRASTRUCTURE & SERVICES (البنية التحتية والخدمات)
+// 🚀 PART 1: SETUP & KEYS (الإعدادات والمفاتيح اليدوية)
 // ============================================================================
 
-// 1. خدمة الإشعارات الخلفية (Background Handler)
+// 1. خدمة الإشعارات الخلفية
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  // هنا نستخدم نفس التهيئه اليدوية في الخلفية أيضاً
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyDlQHl2B8d_8nw8-N6_51MEH4j_KYqz7NA",
+      appId: "1:311376524644:web:a3d9c77a53c0570a0eb671",
+      messagingSenderId: "311376524644",
+      projectId: "afya-dz",
+      storageBucket: "afya-dz.firebasestorage.app",
+    ),
+  );
   print("Handling a background message: ${message.messageId}");
 }
 
-// 2. إعداد قناة الإشعارات المحلية (Android Channel)
+// 2. إعداد قناة الإشعارات
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
-  'high_importance_channel', // id
-  'High Importance Notifications', // title
-  description: 'This channel is used for important notifications.', // description
+  'high_importance_channel',
+  'High Importance Notifications',
+  description: 'This channel is used for important notifications.',
   importance: Importance.high,
 );
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-// 3. نقطة البداية (Main Function)
+// 3. نقطة البداية (Main)
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // تهيئة فايربيز
-  await Firebase.initializeApp();
+  try {
+    // ✅✅ الحل السحري: وضعنا المفاتيح هنا مباشرة ولن يطلب ملف google-services.json أبداً
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: "AIzaSyDlQHl2B8d_8nw8-N6_51MEH4j_KYqz7NA",
+        appId: "1:311376524644:web:a3d9c77a53c0570a0eb671", 
+        messagingSenderId: "311376524644",
+        projectId: "afya-dz",
+        storageBucket: "afya-dz.firebasestorage.app",
+      ),
+    );
+    print("✅ Firebase Connected Successfully via Code!");
 
-  // إعداد الإشعارات الخلفية
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    // إعداد الإشعارات
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+        
+  } catch (e) {
+    print("⚠️ Error Initializing Firebase: $e");
+  }
 
-  // إعداد الإشعارات المحلية (Android)
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
-
-  // إعدادات العرض
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
@@ -69,19 +89,18 @@ void main() async {
   runApp(const AfyaAppPro());
 }
 
-// 4. الثوابت والألوان (App Constants)
+// 4. الثوابت والألوان
 class AppColors {
-  static const Color primary = Color(0xFF00BFA5); // لون التيفاني الطبي
+  static const Color primary = Color(0xFF00BFA5);
   static const Color primaryDark = Color(0xFF008E76);
-  static const Color secondary = Color(0xFF263238); // داكن للنصوص
-  static const Color accent = Color(0xFFFFD740); // أصفر للعروض
+  static const Color secondary = Color(0xFF263238);
+  static const Color accent = Color(0xFFFFD740);
   static const Color background = Color(0xFFF5F7FA);
   static const Color success = Color(0xFF00C853);
   static const Color error = Color(0xFFD50000);
-  static const Color warning = Color(0xFFFFAB00);
 }
 
-// قائمة الولايات (للفلترة الصارمة)
+// قائمة الولايات
 const List<String> dzWilayas = [
   "Adrar", "Chlef", "Laghouat", "Oum El Bouaghi", "Batna", "Béjaïa", "Biskra", "Béchar",
   "Blida", "Bouira", "Tamanrasset", "Tébessa", "Tlemcen", "Tiaret", "Tizi Ouzou", "Algiers",
@@ -93,7 +112,7 @@ const List<String> dzWilayas = [
   "In Salah", "In Guezzam", "Touggourt", "Djanet", "In Gall", "El Meniaa"
 ];
 
-// 5. مزود الحالة (Theme Provider)
+// 5. مزود الحالة (Theme)
 class ThemeProvider extends ChangeNotifier {
   bool _isDarkMode = false;
   bool get isDarkMode => _isDarkMode;
@@ -111,13 +130,11 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-
 final themeProvider = ThemeProvider();
 
-// 6. الجذر الرئيسي للتطبيق (Root Widget)
+// 6. الجذر الرئيسي
 class AfyaAppPro extends StatefulWidget {
   const AfyaAppPro({super.key});
-
   @override
   State<AfyaAppPro> createState() => _AfyaAppProState();
 }
@@ -128,16 +145,11 @@ class _AfyaAppProState extends State<AfyaAppPro> {
     super.initState();
     themeProvider.loadTheme();
     themeProvider.addListener(() { if (mounted) setState(() {}); });
-    _setupNotifications(); // تشغيل الإشعارات
-  }
-
-  // إعداد الإشعارات (Foreground)
-  void _setupNotifications() {
+    
+    // الاستماع للإشعارات
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       RemoteNotification? notification = message.notification;
       AndroidNotification? android = message.notification?.android;
-
-      // إذا وصل إشعار والتطبيق مفتوح، نظهره كنافذة منبثقة
       if (notification != null && android != null) {
         flutterLocalNotificationsPlugin.show(
           notification.hashCode,
@@ -148,9 +160,8 @@ class _AfyaAppProState extends State<AfyaAppPro> {
               channel.id,
               channel.name,
               channelDescription: channel.description,
-              icon: 'launcher_icon', // تأكد من وجود الأيقونة
+              icon: 'launcher_icon',
               importance: Importance.max,
-              priority: Priority.high,
             ),
           ),
         );
@@ -163,8 +174,6 @@ class _AfyaAppProState extends State<AfyaAppPro> {
     return MaterialApp(
       title: 'Afya DZ',
       debugShowCheckedModeBanner: false,
-      
-      // ✅✅ هنا قمنا بإصلاح مشكلة الحقول المربعة ✅✅
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
@@ -176,17 +185,9 @@ class _AfyaAppProState extends State<AfyaAppPro> {
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-          // 👇 هذا السطر هو الحل السحري لمشكلة المربعات
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15), 
-            borderSide: const BorderSide(color: AppColors.primary, width: 2)
-          ),
-          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.red)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
         ),
       ),
-      
-      // الثيم المظلم
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
@@ -196,54 +197,31 @@ class _AfyaAppProState extends State<AfyaAppPro> {
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: const Color(0xFF2C2C2C),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder( // ✅ إصلاح المربعات في الوضع الليلي أيضاً
-            borderRadius: BorderRadius.circular(15), 
-            borderSide: const BorderSide(color: AppColors.primary, width: 2)
-          ),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
         ),
       ),
-      
       themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: const SplashScreen(), // سنضيفها في البارت القادم
-      
-      // إضافة اللغة العربية
-      builder: (context, child) {
-        return Directionality(textDirection: TextDirection.rtl, child: child!);
-      },
+      home: const SplashScreen(),
+      builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
     );
   }
 }
 
-// 7. خدمة مراقبة الإنترنت (Connectivity Wrapper)
-// سنستخدم هذا الـ Widget لتغليف الشاشات المهمة وعرض شريط أحمر عند انقطاع النت
+// 7. مراقب الإنترنت
 class ConnectivityWrapper extends StatelessWidget {
   final Widget child;
   const ConnectivityWrapper({super.key, required this.child});
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<ConnectivityResult>>(
       stream: Connectivity().onConnectivityChanged,
       builder: (context, snapshot) {
         bool isOffline = snapshot.data != null && snapshot.data!.contains(ConnectivityResult.none);
-        
         return Column(
           children: [
             Expanded(child: child),
-            if (isOffline)
-              Container(
-                width: double.infinity,
-                color: Colors.red,
-                padding: const EdgeInsets.all(8),
-                child: const Text(
-                  "لا يوجد اتصال بالإنترنت ⚠️",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-              )
+            if (isOffline) Container(width: double.infinity, color: Colors.red, padding: const EdgeInsets.all(5), child: const Text("لا يوجد إنترنت ⚠️", textAlign: TextAlign.center, style: TextStyle(color: Colors.white)))
           ],
         );
       },
@@ -254,7 +232,7 @@ class ConnectivityWrapper extends StatelessWidget {
 // 🎨 PART 2: UI COMPONENTS & AUTHENTICATION (أدوات التصميم والدخول)
 // ============================================================================
 
-// 1. حقل الإدخال الذكي (Smart Text Field) - ✅ تم إصلاح مشكلة المربعات هنا
+// 1. حقل الإدخال الذكي (Smart Text Field) - ✅ تصميم دائم الاستدارة
 class SmartTextField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
@@ -302,10 +280,7 @@ class _SmartTextFieldState extends State<SmartTextField> {
               color: _isFocused ? AppColors.primary : Colors.grey,
               fontWeight: _isFocused ? FontWeight.bold : FontWeight.normal
             ),
-            prefixIcon: Icon(
-              widget.icon,
-              color: _isFocused ? AppColors.primary : Colors.grey,
-            ),
+            prefixIcon: Icon(widget.icon, color: _isFocused ? AppColors.primary : Colors.grey),
             suffixIcon: widget.isPassword
                 ? IconButton(
                     icon: Icon(_showPass ? Icons.visibility : Icons.visibility_off),
@@ -313,17 +288,14 @@ class _SmartTextFieldState extends State<SmartTextField> {
                   )
                 : null,
             filled: true,
-            // ✅✅ هنا يكمن سر الإصلاح: إجبار الحواف على التقوس دائماً ✅✅
+            // ✅ تثبيت الحواف الدائرية لمنع المربعات
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15), // لا مربع بعد اليوم!
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+              borderRadius: BorderRadius.circular(15), 
+              borderSide: const BorderSide(color: AppColors.primary, width: 2)
             ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: const BorderSide(color: AppColors.error),
-            ),
+            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: AppColors.error)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           ),
         ),
@@ -400,7 +372,6 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -443,13 +414,10 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkAuth() async {
     await Future.delayed(const Duration(seconds: 3));
     if (!mounted) return;
-
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      // المستخدم مسجل -> إلى الرئيسية
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainWrapper()));
     } else {
-      // مستخدم جديد -> إلى الشرح
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OnboardingScreen()));
     }
   }
@@ -490,10 +458,7 @@ class OnboardingScreen extends StatelessWidget {
       body: Container(
         width: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.primary, AppColors.primaryDark],
-            begin: Alignment.topCenter, end: Alignment.bottomCenter
-          )
+          gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark], begin: Alignment.topCenter, end: Alignment.bottomCenter)
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -506,20 +471,13 @@ class OnboardingScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 40),
-            FadeInUp(
-              child: Text("مرحباً بك في عافية", 
-              style: GoogleFonts.tajawal(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white))
-            ),
+            FadeInUp(child: Text("مرحباً بك في عافية", style: GoogleFonts.tajawal(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white))),
             const SizedBox(height: 15),
             FadeInUp(
               delay: const Duration(milliseconds: 200),
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 40),
-                child: Text(
-                  "أقرب ممرض إليك في أقل من 30 دقيقة.\nخدمة موثوقة، آمنة، وسريعة.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.5),
-                ),
+                child: Text("أقرب ممرض إليك في أقل من 30 دقيقة.\nخدمة موثوقة، آمنة، وسريعة.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.5)),
               ),
             ),
             const SizedBox(height: 60),
@@ -527,12 +485,7 @@ class OnboardingScreen extends StatelessWidget {
               delay: const Duration(milliseconds: 400),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: ProButton(
-                  text: "ابدأ الآن",
-                  color: Colors.white,
-                  // ملاحظة: قمنا بتغيير لون النص للأسود ليكون واضحاً على الخلفية البيضاء
-                  onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen())),
-                ),
+                child: ProButton(text: "ابدأ الآن", color: Colors.white, onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen()))),
               ),
             )
           ],
@@ -560,30 +513,22 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() => _loading = true);
     try {
       if (_isLogin) {
-        // تسجيل الدخول
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailCtrl.text.trim(),
-          password: _passCtrl.text.trim()
-        );
+        await FirebaseAuth.instance.signInWithEmailAndPassword(email: _emailCtrl.text.trim(), password: _passCtrl.text.trim());
       } else {
-        // إنشاء حساب جديد
-        UserCredential cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _emailCtrl.text.trim(),
-          password: _passCtrl.text.trim()
-        );
-        // حفظ الاسم في الفايربيز
+        UserCredential cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: _emailCtrl.text.trim(), password: _passCtrl.text.trim());
+        
+        // حفظ البيانات
         await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).set({
           'name': _nameCtrl.text,
           'email': _emailCtrl.text,
-          'role': 'user', // الافتراضي مريض
+          'role': 'user',
           'created_at': FieldValue.serverTimestamp(),
-          'fcm_token': await FirebaseMessaging.instance.getToken(), // ✅ حفظ توكن الإشعارات
+          // ملاحظة: مع التهيئة اليدوية قد لا يعمل الـ Token في بعض الحالات، لكن لن يوقف التطبيق
+          'fcm_token': await FirebaseMessaging.instance.getToken().catchError((e) => null), 
         });
         await cred.user!.updateDisplayName(_nameCtrl.text);
       }
-      
       if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainWrapper()));
-
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? "حدث خطأ"), backgroundColor: AppColors.error));
     }
@@ -592,7 +537,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ConnectivityWrapper( // ✅ إضافة مراقبة الإنترنت
+    return ConnectivityWrapper(
       child: Scaffold(
         body: Center(
           child: SingleChildScrollView(
@@ -600,37 +545,19 @@ class _AuthScreenState extends State<AuthScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                FadeInDown(
-                  child: Text(
-                    _isLogin ? "تسجيل الدخول" : "إنشاء حساب جديد",
-                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary),
-                  ),
-                ),
+                FadeInDown(child: Text(_isLogin ? "تسجيل الدخول" : "إنشاء حساب جديد", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary))),
                 const SizedBox(height: 10),
                 const Text("مرحباً بعودتك لعافية", style: TextStyle(color: Colors.grey)),
                 const SizedBox(height: 40),
       
-                if (!_isLogin)
-                  FadeInUp(child: SmartTextField(controller: _nameCtrl, label: "الاسم الكامل", icon: Icons.person)),
-                
+                if (!_isLogin) FadeInUp(child: SmartTextField(controller: _nameCtrl, label: "الاسم الكامل", icon: Icons.person)),
                 FadeInUp(delay: const Duration(milliseconds: 100), child: SmartTextField(controller: _emailCtrl, label: "البريد الإلكتروني", icon: Icons.email, type: TextInputType.emailAddress)),
                 FadeInUp(delay: const Duration(milliseconds: 200), child: SmartTextField(controller: _passCtrl, label: "كلمة المرور", icon: Icons.lock, isPassword: true)),
       
                 const SizedBox(height: 30),
-                FadeInUp(
-                  delay: const Duration(milliseconds: 300),
-                  child: ProButton(
-                    text: _isLogin ? "دخول" : "تسجيل",
-                    isLoading: _loading,
-                    onPressed: _submit,
-                  ),
-                ),
-                
+                FadeInUp(delay: const Duration(milliseconds: 300), child: ProButton(text: _isLogin ? "دخول" : "تسجيل", isLoading: _loading, onPressed: _submit)),
                 const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () => setState(() => _isLogin = !_isLogin),
-                  child: Text(_isLogin ? "ليس لديك حساب؟ سجل الآن" : "لديك حساب؟ سجل دخولك"),
-                )
+                TextButton(onPressed: () => setState(() => _isLogin = !_isLogin), child: Text(_isLogin ? "ليس لديك حساب؟ سجل الآن" : "لديك حساب؟ سجل دخولك"))
               ],
             ),
           ),
@@ -672,7 +599,7 @@ class _MainWrapperState extends State<MainWrapper> {
           _loading = false;
         });
         
-        // تحديث توكن الإشعارات
+        // تحديث توكن الإشعارات لضمان وصول التنبيهات
         String? token = await FirebaseMessaging.instance.getToken();
         if (token != null) {
           FirebaseFirestore.instance.collection('users').doc(user.uid).update({'fcm_token': token});
@@ -762,13 +689,13 @@ class PatientHomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 25),
 
-              // ✅✅ إصلاح البنر: استدعاء العروض من الفايربيز (Fix #2) ✅✅
+              // ✅ استدعاء العروض من الفايربيز مباشرة
               const Text("عروض حصرية 🔥", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               StreamBuilder<DocumentSnapshot>(
                 stream: FirebaseFirestore.instance.collection('config').doc('promo').snapshots(),
                 builder: (context, snapshot) {
-                  // النص الافتراضي في حالة عدم وجود نت أو بيانات
+                  // النص الافتراضي
                   String title = "خصم 20% هذا الأسبوع";
                   String subtitle = "على جميع الحقن المنزلية";
                   
@@ -914,7 +841,7 @@ class RequestServiceScreen extends StatefulWidget {
 
 class _RequestServiceScreenState extends State<RequestServiceScreen> {
   final _phoneCtrl = TextEditingController();
-  final _descCtrl = TextEditingController(); // ✅ هنا يكتب المريض ملاحظاته (حساسية، طابق..)
+  final _descCtrl = TextEditingController(); // وصف الحالة (مهم للممرض)
   String? _selectedWilaya;
   bool _loading = false;
   Position? _currentPosition;
@@ -926,9 +853,10 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
     _loadUserData();
   }
 
-  // ملء الهاتف تلقائياً إذا كان محفوظاً
+  // ملء الهاتف تلقائياً
   void _loadUserData() {
     final user = FirebaseAuth.instance.currentUser;
+    // إذا كان لدينا رقم هاتف محفوظ
     if (user != null && user.phoneNumber != null) {
       _phoneCtrl.text = user.phoneNumber!;
     }
@@ -950,14 +878,13 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
       // جلب الإحداثيات
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       
-      // محاولة تحويل الإحداثيات لاسم مدينة (اختياري)
+      // محاولة تحويل الإحداثيات لاسم مدينة (Geocoding)
       try {
         List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
         if (placemarks.isNotEmpty) {
-           // محاولة تخمين الولاية تلقائياً
            String? administrativeArea = placemarks.first.administrativeArea; // اسم الولاية
            if (administrativeArea != null) {
-             // البحث عن الولاية في قائمتنا وتحديدها
+             // محاولة تحديد الولاية تلقائياً
              for (var w in dzWilayas) {
                if (administrativeArea.toLowerCase().contains(w.toLowerCase())) {
                  setState(() => _selectedWilaya = w);
@@ -968,7 +895,6 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
            setState(() => _address = "${placemarks.first.street}, ${placemarks.first.locality}");
         }
       } catch (e) {
-        // فشل تحويل الاسم لا يهم، المهم الإحداثيات
         setState(() => _address = "تم تحديد الإحداثيات بنجاح ✅");
       }
 
@@ -993,25 +919,22 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
     try {
       User? user = FirebaseAuth.instance.currentUser;
       
-      // ✅ حفظ الطلب في قاعدة البيانات
+      // حفظ الطلب في قاعدة البيانات
       await FirebaseFirestore.instance.collection('requests').add({
         'service': widget.serviceName,
         'price': widget.basePrice,
         'patient_id': user?.uid,
         'patient_name': user?.displayName ?? "مريض",
         'phone': _phoneCtrl.text,
-        'description': _descCtrl.text, // ✅ النص الذي سيظهر للممرض في النافذة
+        'description': _descCtrl.text, // الملاحظات
         'wilaya': _selectedWilaya,
-        'location': GeoPoint(_currentPosition!.latitude, _currentPosition!.longitude), // 🗺️ إحداثيات دقيقة
+        'location': GeoPoint(_currentPosition!.latitude, _currentPosition!.longitude), // الإحداثيات
         'address': _address,
-        'status': 'pending', // في الانتظار
+        'status': 'pending', // الحالة المبدئية
         'timestamp': FieldValue.serverTimestamp(),
       });
-
-      // ✅ (هنا سيتم إطلاق الإشعار للممرضين عبر Cloud Functions أو Listeners)
       
       if (mounted) {
-        // إظهار نجاح والعودة
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
@@ -1069,17 +992,16 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
             // حقول الإدخال
             SmartTextField(controller: _phoneCtrl, label: "رقم الهاتف للاتصال", icon: Icons.phone, type: TextInputType.phone),
             
-            // ✅ حقل الوصف (الاختياري)
             SmartTextField(
               controller: _descCtrl, 
               label: "وصف الحالة (اختياري)", 
               icon: Icons.description, 
-              maxLines: 3, // جعلناه أكبر للكتابة المريحة
+              maxLines: 3, 
             ),
-            const Text("مثال: الطابق الثالث، الجرس معطل، المريض يعاني من حساسية...", style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const Text("مثال: الطابق الثالث، الجرس معطل، حساسية...", style: TextStyle(color: Colors.grey, fontSize: 12)),
             const SizedBox(height: 20),
 
-            // بطاقة الموقع
+            // زر الموقع
             GestureDetector(
               onTap: _getCurrentLocation,
               child: Container(
@@ -1155,7 +1077,7 @@ class RequestsHistoryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("طلباتي السابقة")),
       body: StreamBuilder<QuerySnapshot>(
-        // ✅ هذا الكود يتطلب الفهرس (Index) الذي أنشأناه في البداية ليعمل
+        // ✅ هذا الكود يستمع للتغييرات في قاعدة البيانات مباشرة
         stream: FirebaseFirestore.instance
             .collection('requests')
             .where('patient_id', isEqualTo: user?.uid)
@@ -1200,6 +1122,9 @@ class RequestsHistoryScreen extends StatelessWidget {
               } else if (status == 'cancelled') {
                 statusColor = Colors.red;
                 statusText = "ملغي ❌";
+              } else if (status == 'on_way') {
+                statusColor = Colors.purple;
+                statusText = "الممرض في الطريق 🚚";
               }
 
               // تحويل التاريخ من Timestamp لنص مقروء
@@ -1316,9 +1241,11 @@ class _NurseDashboardState extends State<NurseDashboard> {
           _nurseWilaya = doc['wilaya']; // مثلاً "Oran"
           _loading = false;
         });
-        // تحديث التوكن لاستلام إشعارات "طلب جديد"
+        // تحديث التوكن لاستلام الإشعارات
         String? token = await FirebaseMessaging.instance.getToken();
-        FirebaseFirestore.instance.collection('users').doc(user.uid).update({'fcm_token': token});
+        if (token != null) {
+          FirebaseFirestore.instance.collection('users').doc(user.uid).update({'fcm_token': token});
+        }
       }
     }
   }
@@ -1327,7 +1254,7 @@ class _NurseDashboardState extends State<NurseDashboard> {
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    // إذا لم يكن للممرض ولاية مسجلة (خطأ في التسجيل)
+    // إذا لم يكن للممرض ولاية مسجلة
     if (_nurseWilaya == null) return const Scaffold(body: Center(child: Text("يرجى تحديث ملفك الشخصي وتحديد الولاية")));
 
     return ConnectivityWrapper(
@@ -1423,7 +1350,7 @@ class _MyActiveTasksList extends StatelessWidget {
   }
 }
 
-// 3. بطاقة الطلب الذكية للممرض (هنا يوجد السحر كله)
+// 3. بطاقة الطلب الذكية للممرض
 class _NurseRequestCard extends StatelessWidget {
   final DocumentSnapshot doc;
   final bool isMyTask; // هل هذا الطلب في قائمة مهامي أم في الانتظار؟
@@ -1448,7 +1375,7 @@ class _NurseRequestCard extends StatelessWidget {
     GeoPoint loc = data['location'];
     String status = data['status'];
     
-    // ✅ التحقق من وجود ملاحظة للمريض (الإصلاح رقم 10)
+    // التحقق من وجود ملاحظة
     bool hasNote = data['description'] != null && data['description'].toString().isNotEmpty;
 
     return Container(
@@ -1460,13 +1387,12 @@ class _NurseRequestCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // 1. الخريطة المصغرة (صورة ثابتة للمكان)
+          // 1. الخريطة المصغرة
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             child: SizedBox(
               height: 150,
               width: double.infinity,
-              // نستخدم Flutter Map لعرض موقع ثابت
               child: FlutterMap(
                 options: MapOptions(
                   initialCenter: LatLng(loc.latitude, loc.longitude),
@@ -1508,7 +1434,7 @@ class _NurseRequestCard extends StatelessWidget {
 
                 // 3. أزرار التحكم
                 if (!isMyTask)
-                  // زر القبول (للطلبات الجديدة)
+                  // زر القبول
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -1529,22 +1455,21 @@ class _NurseRequestCard extends StatelessWidget {
                           'nurse_name': nurse.displayName,
                           'nurse_phone': nurse.phoneNumber ?? "00000000",
                         });
-                        // هنا سيصل الإشعار للمريض (تم القبول)
                       },
                     ),
                   )
                 else
-                  // أزرار التحكم في المهمة (اتصال، ملاحة، إنهاء)
+                  // أزرار التحكم في المهمة
                   Row(
                     children: [
                       // زر الاتصال
                       _CircleBtn(icon: Icons.phone, color: Colors.green, onTap: () => _callPatient(data['phone'])),
                       const SizedBox(width: 10),
-                      // زر الملاحة (جوجل ماب)
+                      // زر الملاحة
                       _CircleBtn(icon: Icons.map, color: Colors.blue, onTap: () => _openMap(loc.latitude, loc.longitude)),
                       const SizedBox(width: 10),
                       
-                      // ✅ زر الملاحظة (يظهر فقط إذا وجدت ملاحظة)
+                      // زر الملاحظة
                       if (hasNote)
                         _CircleBtn(
                           icon: Icons.sticky_note_2, 
@@ -1563,7 +1488,7 @@ class _NurseRequestCard extends StatelessWidget {
                         
                       const Spacer(),
 
-                      // زر تغيير الحالة (في الطريق -> إنهاء)
+                      // زر تغيير الحالة
                       Expanded(
                         flex: 2,
                         child: ElevatedButton(
@@ -1626,7 +1551,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final List<Widget> _pages = [
     const _AdminRequestsView(), // مراقبة الطلبات
     const _AdminNursesView(),   // إدارة الممرضين
-    const _AdminControlRoom(),  // ⚙️ غرفة التحكم (أسعار + عروض + إشعارات)
+    const _AdminControlRoom(),  // غرفة التحكم (أسعار + عروض + إشعارات)
   ];
 
   @override
@@ -1650,7 +1575,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.receipt_long), label: "الطلبات"),
           NavigationDestination(icon: Icon(Icons.people_alt), label: "الممرضين"),
-          NavigationDestination(icon: Icon(Icons.settings_suggest), label: "التحكم"), // ✅ القسم الجديد
+          NavigationDestination(icon: Icon(Icons.settings_suggest), label: "التحكم"),
         ],
       ),
     );
@@ -1723,7 +1648,7 @@ class _AdminNursesView extends StatelessWidget {
   }
 }
 
-// 3. ⚙️ غرفة التحكم (Control Room) - هنا الميزات الجديدة
+// 3. ⚙️ غرفة التحكم (Control Room)
 class _AdminControlRoom extends StatefulWidget {
   const _AdminControlRoom();
   @override
@@ -1748,45 +1673,21 @@ class _AdminControlRoomState extends State<_AdminControlRoom> {
     }
   }
 
-  // تحديث سعر خدمة (مثال)
-  void _updatePrice(String serviceId, String newPrice) {
-    // هذه الدالة تحفظ السعر في قاعدة البيانات
-    // ملاحظة: لكي ينعكس السعر في واجهة المريض، يجب أن نعدل كود "ServiceCard" ليقرأ من هنا مستقبلاً
-    FirebaseFirestore.instance.collection('config').doc('prices').set({
-      serviceId: int.tryParse(newPrice) ?? 0
-    }, SetOptions(merge: true));
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("تم تحديث سعر $serviceId")));
-  }
-
-  // 📢 إرسال إشعار للجميع (Broadcast)
+  // إرسال إشعار للجميع
   Future<void> _sendBroadcast() async {
     if (_notifTitleCtrl.text.isEmpty || _notifBodyCtrl.text.isEmpty) return;
-
-    // ملاحظة: لإرسال إشعار لآلاف المستخدمين، الأفضل استخدام Topic Messaging
-    // هنا سنقوم بإرسال Topic يسمى 'all_users'
-    // يجب أن يشترك المستخدمون في هذا الموضوع (سنضيف كود الاشتراك في البارت الأخير)
     
-    try {
-      // ⚠️ تنبيه: هذا الكود يحتاج "Server Key" من إعدادات الفايربيز
-      // سنستخدم طريقة بسيطة حالياً وهي الكتابة في وثيقة "notifications"
-      // ويمكن لـ Cloud Function الاستماع لها وإرسال الإشعار، أو استخدام API مباشرة.
-      
-      // للطريقة المباشرة (HTTP V1) الكود معقد قليلاً هنا، لذا سنعتمد طريقة "الوثيقة"
-      // ونفترض أن لديك Cloud Function، أو سنرسل Topic بسيط إذا كنت تملك المفتاح.
-      
-      await FirebaseFirestore.instance.collection('broadcasts').add({
-        'title': _notifTitleCtrl.text,
-        'body': _notifBodyCtrl.text,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم جدولة الإشعار للإرسال 🚀")));
-      _notifTitleCtrl.clear();
-      _notifBodyCtrl.clear();
-
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("فشل الإرسال"), backgroundColor: Colors.red));
-    }
+    // محاكاة إرسال (لأن الإرسال الحقيقي يحتاج Cloud Functions)
+    // هنا سنحفظه في قاعدة البيانات فقط
+    await FirebaseFirestore.instance.collection('broadcasts').add({
+      'title': _notifTitleCtrl.text,
+      'body': _notifBodyCtrl.text,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم جدولة الإشعار للإرسال 🚀")));
+    _notifTitleCtrl.clear();
+    _notifBodyCtrl.clear();
   }
 
   @override
@@ -1807,7 +1708,7 @@ class _AdminControlRoomState extends State<_AdminControlRoom> {
           const Divider(height: 40),
 
           const Text("💰 إدارة الأسعار", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const Text("غيّر الأسعار الحالية (تنعكس عند إعادة التشغيل)", style: TextStyle(color: Colors.grey, fontSize: 12)),
+          const Text("غيّر الأسعار الحالية", style: TextStyle(color: Colors.grey, fontSize: 12)),
           const SizedBox(height: 10),
           _PriceEditRow(label: "سعر الحقن", serviceKey: "injection"),
           _PriceEditRow(label: "سعر السيروم", serviceKey: "serum"),
@@ -1885,8 +1786,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text("حفظ"),
             onPressed: () async {
               if (nameCtrl.text.isNotEmpty) {
+                // تحديث في فايربيز Auth
                 await user?.updateDisplayName(nameCtrl.text);
+                // تحديث في قاعدة البيانات
                 await FirebaseFirestore.instance.collection('users').doc(user!.uid).update({'name': nameCtrl.text});
+                
                 await user?.reload();
                 setState(() => user = FirebaseAuth.instance.currentUser);
                 if (mounted) Navigator.pop(context);
@@ -1907,16 +1811,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _localImage = File(image.path);
       });
-      // ملاحظة: لرفع الصورة للسيرفر نحتاج تفعيل Firebase Storage
-      // حالياً سنعرضها محلياً فقط ليرى المستخدم التغيير
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم تحديث الصورة (محلياً) ✅")));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(title: const Text("الملف الشخصي")),
       body: SingleChildScrollView(
@@ -1963,7 +1863,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(user?.displayName ?? "مستخدم", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.edit, size: 18, color: Colors.grey), onPressed: _editName) // ✅ تعديل الاسم
+                IconButton(icon: const Icon(Icons.edit, size: 18, color: Colors.grey), onPressed: _editName)
               ],
             ),
             Text(user?.email ?? "", style: const TextStyle(color: Colors.grey)),
@@ -1991,7 +1891,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     activeColor: Colors.blue,
                     onChanged: (val) {
                       setState(() => _isFrench = val);
-                      // هنا يمكن تغيير Directionality أو استدعاء ملفات اللغة
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("سيتم إضافة الترجمة الكاملة في التحديث القادم")));
                     },
                   ),
@@ -2030,7 +1929,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             
             const SizedBox(height: 30),
-            Text("V 2.0.0 (Titanium Edition)", style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+            Text("V 2.0.0 (Direct Connect Edition)", style: TextStyle(color: Colors.grey[400], fontSize: 12)),
             const SizedBox(height: 50),
           ],
         ),
