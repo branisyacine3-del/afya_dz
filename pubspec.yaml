@@ -36,6 +36,18 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  # ✅ تمت إضافة مكتبة صناعة الأيقونات
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
+
+# ==========================================
+# 🖼️ إعدادات أيقونة التطبيق (App Icon Config)
+# ==========================================
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  # ⚠️ تأكد أن الصورة موجودة بجانب ملف pubspec.yaml تماماً
+  image_path: Picsart_26-01-15_11-27-34-308.png"
+  min_sdk_android: 21
