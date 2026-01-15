@@ -538,7 +538,7 @@ class WelcomeScreen extends StatelessWidget {
                 const SizedBox(height: 30),
                 const Text("عروض حصرية", style: AppTheme.headerStyle),
                 const SizedBox(height: 15),
-                Container(height: 140, decoration: BoxDecoration(gradient: AppTheme.goldGradient, borderRadius: BorderRadius.circular(24), boxShadow: AppTheme.softShadow), child: Row(children: [const Expanded(child: Padding(padding: EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text("خصم 20%", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)), Text("على الحقن المنزلية", style: TextStyle(color: Colors.white))]))), Image.network("https://cdn-icons-png.flaticon.com/512/3063/3063205.png", width: 100, errorBuilder: (c,e,s)=>const Icon(Icons.local_offer, size: 80, color: Colors.white.withOpacity(0.5)))])),
+                Container(height: 140, decoration: BoxDecoration(gradient: AppTheme.goldGradient, borderRadius: BorderRadius.circular(24), boxShadow: AppTheme.softShadow), child: Row(children: [const Expanded(child: Padding(padding: EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text("خصم 20%", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)), Text("على الحقن المنزلية", style: TextStyle(color: Colors.white))]))), Image.network("https://cdn-icons-png.flaticon.com/512/3063/3063205.png", width: 100, errorBuilder: (c,e,s)=> Icon(Icons.local_offer, size: 80, color: Colors.white.withOpacity(0.5)))])),
               ]),
             ),
           ),
@@ -831,7 +831,7 @@ class NurseAuthGate extends StatelessWidget {
             
             // شاشات الانتظار الملونة
             if (st == 'pending_docs') return _statusScreen(Icons.hourglass_top_rounded, AppTheme.accent, "ملفك قيد المراجعة", "يقوم فريق الإدارة بمراجعة وثائقك بدقة..\nسيتم الرد عليك قريباً.");
-            if (st == 'pending_payment' || st == 'expired') return const NursePay(isRenewal: st == 'expired'); // تمرير حالة التجديد
+            if (st == 'pending_payment' || st == 'expired') return NursePay(isRenewal: st == 'expired'); // تمرير حالة التجديد
             if (st == 'payment_review') return _statusScreen(Icons.verified_user_rounded, Colors.blue, "مراجعة الدفع", "وصلنا الوصل ونقوم بمراجعته لتفعيل اشتراكك الشهري.");
             
             return const NurseForm();
