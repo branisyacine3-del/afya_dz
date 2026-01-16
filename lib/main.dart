@@ -640,13 +640,20 @@ class _AuthScreenState extends State<AuthScreen> {
         // جلب البيانات لمعرفة أين نوجهه
         var doc = await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).get();
         if (doc.exists) {
-          String role = doc['role'];
-          if (role == 'patient') {
-             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainWrapper()));
-          } else {
-             // تحقق هل هو مفعل أم لا (في البارتات القادمة)
-             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProviderMainWrapper()));
-          }
+                      // ✅ كود فحص الأدمن عند الدخول
+            var data = doc.data() as Map<String, dynamic>;
+            if (data['email'] == "admin@afya.dz") {
+               Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminDashboard()));
+               return; 
+            }
+            // --------------------------------
+
+            String role = data['role']; 
+            if (role == 'patient') {
+               Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainWrapper()));
+            } else {
+               Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProviderMainWrapper()));
+            }
         }
       }
     } on FirebaseAuthException catch (e) {
