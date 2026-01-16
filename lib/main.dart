@@ -1335,7 +1335,8 @@ class PatientHomeScreen extends StatelessWidget {
                   ),
                   _ServiceCategoryCard(
                     title: "نقل وإسعاف", 
-                    icon: Icons.ambulance, 
+                    icon: Icons.medical_services,
+ 
                     color: Colors.red, 
                     onTap: () => _showSubServices(context, "ambulance", "نقل المرضى")
                   ),
@@ -1605,23 +1606,6 @@ class _ServiceItemTile extends StatelessWidget {
   }
 }
 
-// Stub - سيتم استبداله في البارت 5
-class PatientHistoryScreen extends StatelessWidget {
-  const PatientHistoryScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text("سجل الطلبات (قيد الإنشاء)...")));
-  }
-}
-
-// Stub - سيتم استبداله في البارت 8
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text("الملف الشخصي (قيد الإنشاء)...")));
-  }
-}
 // ============================================================================
 // 🚑 PART 5: ORDER FORM & GPS LOCATION (شاشة إتمام الطلب وتحديد الموقع)
 // ============================================================================
