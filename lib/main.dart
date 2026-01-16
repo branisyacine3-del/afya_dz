@@ -1,65 +1,77 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-// --- المكتبات الخارجية ---
+// --- مكتبات فايربيز ---
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+
+// --- مكتبات النظام والخرائط ---
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
-import 'package:intl/intl.dart' as intl;
-import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:animate_do/animate_do.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart' as intl;
+import 'package:uuid/uuid.dart';
+import 'package:http/http.dart' as http;
+
+// --- مكتبات التصميم ---
+import 'package:google_fonts/google_fonts.dart';
+import 'package:animate_do/animate_do.dart';
 
 // ============================================================================
-// 🚀 PART 1: SETUP & KEYS (الإعدادات والمفاتيح اليدوية)
+// 🛠️ PART 1: INITIALIZATION & THEME (التهيئة، المفاتيح، والثيم)
 // ============================================================================
 
-// 1. خدمة الإشعارات الخلفية
+// 1. معالج الإشعارات في الخلفية
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // هنا نستخدم نفس التهيئه اليدوية في الخلفية أيضاً
   await Firebase.initializeApp(
     options: const FirebaseOptions(
       apiKey: "AIzaSyDlQHl2B8d_8nw8-N6_51MEH4j_KYqz7NA",
-      appId: "1:311376524644:web:a3d9c77a53c0570a0eb671",
+      appId: "1:311376524644:web:a3d9c77a53c0570a0eb671", 
       messagingSenderId: "311376524644",
       projectId: "afya-dz",
       storageBucket: "afya-dz.firebasestorage.app",
     ),
   );
-  print("Handling a background message: ${message.messageId}");
+  print("Background Message: ${message.messageId}");
 }
 
-// 2. إعداد قناة الإشعارات
+// 2. قناة الإشعارات
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
-  'high_importance_channel',
-  'High Importance Notifications',
-  description: 'This channel is used for important notifications.',
+  'high_importance_channel', 
+  'إشعارات عافية الهامة', 
+  description: 'تستخدم للتنبيهات العاجلة',
   importance: Importance.high,
+  playSound: true,
 );
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-// 3. نقطة البداية (Main)
+// 3. دالة التشغيل الرئيسية
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // تثبيت الشاشة عمودياً
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+  ));
+
   try {
-    // ✅✅ الحل السحري: وضعنا المفاتيح هنا مباشرة ولن يطلب ملف google-services.json أبداً
+    // ✅ الاتصال المباشر (Direct Connect) لحل مشكلة الشاشة السوداء
     await Firebase.initializeApp(
       options: const FirebaseOptions(
         apiKey: "AIzaSyDlQHl2B8d_8nw8-N6_51MEH4j_KYqz7NA",
@@ -69,53 +81,37 @@ void main() async {
         storageBucket: "afya-dz.firebasestorage.app",
       ),
     );
-    print("✅ Firebase Connected Successfully via Code!");
+    print("✅ FIREBASE CONNECTED SUCCESSFULLY");
 
-    // إعداد الإشعارات
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    
     await flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
-        
+
+    await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true);
+
   } catch (e) {
-    print("⚠️ Error Initializing Firebase: $e");
+    print("⚠️ Error: $e");
   }
 
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-  ));
-
-  runApp(const AfyaAppPro());
+  runApp(const AfyaAppV10());
 }
 
-// 4. الثوابت والألوان
+// 4. الألوان الطبية (V10 Palette)
 class AppColors {
-  static const Color primary = Color(0xFF00BFA5);
-  static const Color primaryDark = Color(0xFF008E76);
-  static const Color secondary = Color(0xFF263238);
-  static const Color accent = Color(0xFFFFD740);
-  static const Color background = Color(0xFFF5F7FA);
-  static const Color success = Color(0xFF00C853);
-  static const Color error = Color(0xFFD50000);
-  
-  // ✅ هذا هو السطر الجديد الذي يجب إضافته
-  static const Color warning = Color(0xFFFFA000); 
+  static const Color primary = Color(0xFF009688); // Teal Medical
+  static const Color primaryDark = Color(0xFF00796B);
+  static const Color accent = Color(0xFFFFC107); // Amber for alerts
+  static const Color backgroundLight = Color(0xFFF5F7FA);
+  static const Color backgroundDark = Color(0xFF121212);
+  static const Color success = Color(0xFF4CAF50);
+  static const Color error = Color(0xFFD32F2F);
+  static const Color warning = Color(0xFFFFA000);
+  static const Color info = Color(0xFF2196F3);
 }
 
-// قائمة الولايات
-const List<String> dzWilayas = [
-  "Adrar", "Chlef", "Laghouat", "Oum El Bouaghi", "Batna", "Béjaïa", "Biskra", "Béchar",
-  "Blida", "Bouira", "Tamanrasset", "Tébessa", "Tlemcen", "Tiaret", "Tizi Ouzou", "Algiers",
-  "Djelfa", "Jijel", "Sétif", "Saïda", "Skikda", "Sidi Bel Abbès", "Annaba", "Guelma",
-  "Constantine", "Médéa", "Mostaganem", "M'Sila", "Mascara", "Ouargla", "Oran", "El Bayadh",
-  "Illizi", "Bordj Bou Arréridj", "Boumerdès", "El Tarf", "Tindouf", "Tissemsilt", "El Oued",
-  "Khenchela", "Souk Ahras", "Tipaza", "Mila", "Aïn Defla", "Naâma", "Aïn Témouchent",
-  "Ghardaïa", "Relizane", "Timimoun", "Bordj Badji Mokhtar", "Ouled Djellal", "Béni Abbès",
-  "In Salah", "In Guezzam", "Touggourt", "Djanet", "In Gall", "El Meniaa"
-];
-
-// 5. مزود الحالة (Theme)
+// 5. مزود الثيم
 class ThemeProvider extends ChangeNotifier {
   bool _isDarkMode = false;
   bool get isDarkMode => _isDarkMode;
@@ -136,20 +132,19 @@ class ThemeProvider extends ChangeNotifier {
 final themeProvider = ThemeProvider();
 
 // 6. الجذر الرئيسي
-class AfyaAppPro extends StatefulWidget {
-  const AfyaAppPro({super.key});
+class AfyaAppV10 extends StatefulWidget {
+  const AfyaAppV10({super.key});
   @override
-  State<AfyaAppPro> createState() => _AfyaAppProState();
+  State<AfyaAppV10> createState() => _AfyaAppV10State();
 }
 
-class _AfyaAppProState extends State<AfyaAppPro> {
+class _AfyaAppV10State extends State<AfyaAppV10> {
   @override
   void initState() {
     super.initState();
     themeProvider.loadTheme();
     themeProvider.addListener(() { if (mounted) setState(() {}); });
     
-    // الاستماع للإشعارات
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       RemoteNotification? notification = message.notification;
       AndroidNotification? android = message.notification?.android;
@@ -163,8 +158,9 @@ class _AfyaAppProState extends State<AfyaAppPro> {
               channel.id,
               channel.name,
               channelDescription: channel.description,
-              icon: 'launcher_icon',
+              icon: '@mipmap/ic_launcher',
               importance: Importance.max,
+              color: AppColors.primary,
             ),
           ),
         );
@@ -177,230 +173,33 @@ class _AfyaAppProState extends State<AfyaAppPro> {
     return MaterialApp(
       title: 'Afya DZ',
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
-        scaffoldBackgroundColor: AppColors.background,
+        primaryColor: AppColors.primary,
+        scaffoldBackgroundColor: AppColors.backgroundLight,
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary, brightness: Brightness.light),
         textTheme: GoogleFonts.tajawalTextTheme(ThemeData.light().textTheme),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-        ),
+        appBarTheme: const AppBarTheme(backgroundColor: AppColors.primary, foregroundColor: Colors.white, centerTitle: true),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF121212),
+        scaffoldBackgroundColor: AppColors.backgroundDark,
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary, brightness: Brightness.dark),
         textTheme: GoogleFonts.tajawalTextTheme(ThemeData.dark().textTheme),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFF2C2C2C),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-        ),
       ),
       themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: const SplashScreen(),
-      builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
-    );
-  }
-}
-
-// 7. مراقب الإنترنت
-class ConnectivityWrapper extends StatelessWidget {
-  final Widget child;
-  const ConnectivityWrapper({super.key, required this.child});
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<ConnectivityResult>>(
-      stream: Connectivity().onConnectivityChanged,
-      builder: (context, snapshot) {
-        bool isOffline = snapshot.data != null && snapshot.data!.contains(ConnectivityResult.none);
-        return Column(
-          children: [
-            Expanded(child: child),
-            if (isOffline) Container(width: double.infinity, color: Colors.red, padding: const EdgeInsets.all(5), child: const Text("لا يوجد إنترنت ⚠️", textAlign: TextAlign.center, style: TextStyle(color: Colors.white)))
-          ],
-        );
-      },
+      home: const SplashScreen(), 
     );
   }
 }
 // ============================================================================
-// 🎨 PART 2: UI COMPONENTS & AUTHENTICATION (أدوات التصميم والدخول)
+// 🎨 PART 2: UI COMPONENTS & AUTHENTICATION (التصميم وشاشات الدخول)
 // ============================================================================
 
-// 1. حقل الإدخال الذكي (Smart Text Field) - ✅ تصميم دائم الاستدارة
-class SmartTextField extends StatefulWidget {
-  final TextEditingController controller;
-  final String label;
-  final IconData icon;
-  final bool isPassword;
-  final TextInputType type;
-  final int maxLines;
-  final bool readOnly;
-
-  const SmartTextField({
-    super.key,
-    required this.controller,
-    required this.label,
-    required this.icon,
-    this.isPassword = false,
-    this.type = TextInputType.text,
-    this.maxLines = 1,
-    this.readOnly = false,
-  });
-
-  @override
-  State<SmartTextField> createState() => _SmartTextFieldState();
-}
-
-class _SmartTextFieldState extends State<SmartTextField> {
-  bool _isFocused = false;
-  bool _showPass = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Focus(
-        onFocusChange: (focus) => setState(() => _isFocused = focus),
-        child: TextField(
-          controller: widget.controller,
-          obscureText: widget.isPassword && !_showPass,
-          keyboardType: widget.type,
-          maxLines: widget.maxLines,
-          readOnly: widget.readOnly,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-          decoration: InputDecoration(
-            labelText: widget.label,
-            labelStyle: TextStyle(
-              color: _isFocused ? AppColors.primary : Colors.grey,
-              fontWeight: _isFocused ? FontWeight.bold : FontWeight.normal
-            ),
-            prefixIcon: Icon(widget.icon, color: _isFocused ? AppColors.primary : Colors.grey),
-            suffixIcon: widget.isPassword
-                ? IconButton(
-                    icon: Icon(_showPass ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () => setState(() => _showPass = !_showPass),
-                  )
-                : null,
-            filled: true,
-            // ✅ تثبيت الحواف الدائرية لمنع المربعات
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15), 
-              borderSide: const BorderSide(color: AppColors.primary, width: 2)
-            ),
-            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: AppColors.error)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// 2. الزر الاحترافي (Pro Button)
-class ProButton extends StatelessWidget {
-  final String text;
-  final VoidCallback? onPressed;
-  final Color color;
-  final IconData? icon;
-  final bool isLoading;
-  final bool isSmall;
-
-  const ProButton({
-    super.key,
-    required this.text,
-    required this.onPressed,
-    this.color = AppColors.primary,
-    this.icon,
-    this.isLoading = false,
-    this.isSmall = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: isSmall ? null : double.infinity,
-      height: isSmall ? 40 : 55,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          elevation: 5,
-          shadowColor: color.withOpacity(0.4),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        ),
-        child: isLoading
-            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (icon != null) ...[Icon(icon, size: isSmall ? 16 : 22), const SizedBox(width: 10)],
-                  Text(text, style: TextStyle(fontSize: isSmall ? 14 : 18, fontWeight: FontWeight.bold)),
-                ],
-              ),
-      ),
-    );
-  }
-}
-
-// 3. البطاقة الزجاجية (Glass Card)
-class GlassCard extends StatelessWidget {
-  final Widget child;
-  final VoidCallback? onTap;
-  final EdgeInsets padding;
-  final Color? color;
-  final bool borderGlow;
-
-  const GlassCard({
-    super.key,
-    required this.child,
-    this.onTap,
-    this.padding = const EdgeInsets.all(15),
-    this.color,
-    this.borderGlow = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 15),
-        padding: padding,
-        decoration: BoxDecoration(
-          color: color ?? (isDark ? const Color(0xFF1E1E1E) : Colors.white),
-          borderRadius: BorderRadius.circular(20),
-          border: borderGlow 
-              ? Border.all(color: AppColors.primary.withOpacity(0.5), width: 1.5)
-              : Border.all(color: Colors.white.withOpacity(isDark ? 0.05 : 0.4)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            )
-          ],
-        ),
-        child: child,
-      ),
-    );
-  }
-}
-
-// 4. شاشة البداية (Splash Screen)
+// 1. شاشة البداية (Splash Screen)
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override
@@ -411,94 +210,156 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAuth();
+    _checkUser();
   }
 
-  Future<void> _checkAuth() async {
-    await Future.delayed(const Duration(seconds: 3));
-    if (!mounted) return;
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
+  Future<void> _checkUser() async {
+    await Future.delayed(const Duration(seconds: 3)); // عرض الشعار لمدة 3 ثواني
+    if (FirebaseAuth.instance.currentUser != null) {
+      // المستخدم مسجل -> توجيه للموجه الرئيسي (سنبني MainWrapper في البارت القادم)
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainWrapper()));
     } else {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+      // غير مسجل -> شاشة الدخول
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.primary,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            FadeInDown(
-              child: Container(
+        child: FadeInDown(
+          duration: const Duration(milliseconds: 1200),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.health_and_safety, size: 80, color: AppColors.primary),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 20)]),
+                child: const Icon(Icons.local_hospital, size: 80, color: AppColors.primary),
               ),
-            ),
-            const SizedBox(height: 20),
-            FadeInUp(child: const Text("Afya DZ", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold))),
-            FadeInUp(delay: const Duration(milliseconds: 200), child: const Text("عافيتك تصلك للمنزل", style: TextStyle(color: Colors.grey))),
-            const SizedBox(height: 40),
-            FadeInUp(delay: const Duration(milliseconds: 400), child: const CircularProgressIndicator(color: AppColors.primary)),
-          ],
+              const SizedBox(height: 20),
+              Text("عافية", style: GoogleFonts.tajawal(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text("رعايتك الصحية.. في بيتك", style: GoogleFonts.tajawal(fontSize: 18, color: Colors.white70)),
+              const SizedBox(height: 50),
+              const CircularProgressIndicator(color: Colors.white)
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// 5. شاشة الشرح (Onboarding)
-class OnboardingScreen extends StatelessWidget {
-  const OnboardingScreen({super.key});
+// 2. المكونات المشتركة (Custom Widgets) لضمان الفخامة
+class GlassCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsets? padding;
+  final Color? color;
+  const GlassCard({super.key, required this.child, this.padding, this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark], begin: Alignment.topCenter, end: Alignment.bottomCenter)
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            FadeInDown(
-              child: Container(
-                padding: const EdgeInsets.all(30),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-                child: const Icon(Icons.medical_services_outlined, size: 100, color: Colors.white),
-              ),
-            ),
-            const SizedBox(height: 40),
-            FadeInUp(child: Text("مرحباً بك في عافية", style: GoogleFonts.tajawal(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white))),
-            const SizedBox(height: 15),
-            FadeInUp(
-              delay: const Duration(milliseconds: 200),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 40),
-                child: Text("أقرب ممرض إليك في أقل من 30 دقيقة.\nخدمة موثوقة، آمنة، وسريعة.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.5)),
-              ),
-            ),
-            const SizedBox(height: 60),
-            FadeInUp(
-              delay: const Duration(milliseconds: 400),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: ProButton(text: "ابدأ الآن", color: Colors.white, onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen()))),
-              ),
-            )
-          ],
+    return Container(
+      padding: padding ?? const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: color ?? Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 5))],
+        border: Border.all(color: Colors.white.withOpacity(0.5)),
+      ),
+      child: child,
+    );
+  }
+}
+
+class SmartTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final bool isPassword;
+  final TextInputType type;
+  final int maxLines;
+
+  const SmartTextField({
+    super.key, 
+    required this.controller, 
+    required this.label, 
+    required this.icon, 
+    this.isPassword = false, 
+    this.type = TextInputType.text,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(15)),
+      child: TextField(
+        controller: controller,
+        obscureText: isPassword,
+        keyboardType: type,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: AppColors.primary),
+          hintText: label,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         ),
       ),
     );
   }
 }
 
-// 6. شاشة التسجيل والدخول (Auth Screen)
+class ProButton extends StatelessWidget {
+  final String text;
+  final VoidCallback onPressed;
+  final Color color;
+  final IconData? icon;
+  final bool isLoading;
+  final bool isSmall;
+
+  const ProButton({
+    super.key, 
+    required this.text, 
+    required this.onPressed, 
+    this.color = AppColors.primary, 
+    this.icon, 
+    this.isLoading = false,
+    this.isSmall = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: isSmall ? null : double.infinity,
+      height: 55,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          elevation: 5,
+        ),
+        onPressed: isLoading ? null : onPressed,
+        child: isLoading 
+            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[Icon(icon, color: Colors.white, size: 20), const SizedBox(width: 10)],
+                  Text(text, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+// 3. شاشة التسجيل والدخول الموحدة (Auth Screen)
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
   @override
@@ -508,61 +369,108 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
   bool _loading = false;
+  
+  final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  final _nameCtrl = TextEditingController();
-
+  final _phoneCtrl = TextEditingController();
+  
+  // دالة الدخول / التسجيل
   Future<void> _submit() async {
+    if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) return;
+    if (!_isLogin && (_nameCtrl.text.isEmpty || _phoneCtrl.text.isEmpty)) return;
+
     setState(() => _loading = true);
     try {
+      UserCredential cred;
       if (_isLogin) {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(email: _emailCtrl.text.trim(), password: _passCtrl.text.trim());
+        // تسجيل الدخول
+        cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailCtrl.text.trim(), 
+          password: _passCtrl.text.trim()
+        );
       } else {
-        UserCredential cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: _emailCtrl.text.trim(), password: _passCtrl.text.trim());
+        // إنشاء حساب جديد
+        cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _emailCtrl.text.trim(), 
+          password: _passCtrl.text.trim()
+        );
         
-        // حفظ البيانات
+        // حفظ بيانات المستخدم في فايربيز (Firestore)
         await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).set({
           'name': _nameCtrl.text,
           'email': _emailCtrl.text,
-          'role': 'user',
+          'phone': _phoneCtrl.text,
+          'role': 'user', // افتراضياً مستخدم عادي
           'created_at': FieldValue.serverTimestamp(),
-          // ملاحظة: مع التهيئة اليدوية قد لا يعمل الـ Token في بعض الحالات، لكن لن يوقف التطبيق
-          'fcm_token': await FirebaseMessaging.instance.getToken().catchError((e) => null), 
+          'fcm_token': await FirebaseMessaging.instance.getToken(), // لحفظ توكن الإشعارات
         });
+        
+        // تحديث اسم المستخدم في Auth
         await cred.user!.updateDisplayName(_nameCtrl.text);
       }
+      
+      // التوجيه للرئيسية
       if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainWrapper()));
+
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? "حدث خطأ"), backgroundColor: AppColors.error));
+      String msg = "حدث خطأ ما";
+      if (e.code == 'user-not-found') msg = "المستخدم غير موجود";
+      if (e.code == 'wrong-password') msg = "كلمة المرور خاطئة";
+      if (e.code == 'email-already-in-use') msg = "البريد مسجل مسبقاً";
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.error));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e"), backgroundColor: AppColors.error));
     }
     setState(() => _loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return ConnectivityWrapper(
-      child: Scaffold(
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FadeInDown(child: Text(_isLogin ? "تسجيل الدخول" : "إنشاء حساب جديد", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary))),
-                const SizedBox(height: 10),
-                const Text("مرحباً بعودتك لعافية", style: TextStyle(color: Colors.grey)),
-                const SizedBox(height: 40),
-      
-                if (!_isLogin) FadeInUp(child: SmartTextField(controller: _nameCtrl, label: "الاسم الكامل", icon: Icons.person)),
-                FadeInUp(delay: const Duration(milliseconds: 100), child: SmartTextField(controller: _emailCtrl, label: "البريد الإلكتروني", icon: Icons.email, type: TextInputType.emailAddress)),
-                FadeInUp(delay: const Duration(milliseconds: 200), child: SmartTextField(controller: _passCtrl, label: "كلمة المرور", icon: Icons.lock, isPassword: true)),
-      
-                const SizedBox(height: 30),
-                FadeInUp(delay: const Duration(milliseconds: 300), child: ProButton(text: _isLogin ? "دخول" : "تسجيل", isLoading: _loading, onPressed: _submit)),
-                const SizedBox(height: 20),
-                TextButton(onPressed: () => setState(() => _isLogin = !_isLogin), child: Text(_isLogin ? "ليس لديك حساب؟ سجل الآن" : "لديك حساب؟ سجل دخولك"))
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(25),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 30),
+              Center(child: Icon(Icons.security, size: 80, color: AppColors.primary.withOpacity(0.8))),
+              const SizedBox(height: 20),
+              Text(_isLogin ? "مرحباً بعودتك 👋" : "حساب جديد 🚀", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+              Text(_isLogin ? "سجل دخولك للمتابعة" : "انضم لعائلة عافية الآن", style: TextStyle(color: Colors.grey[600])),
+              const SizedBox(height: 40),
+              
+              if (!_isLogin) ...[
+                SmartTextField(controller: _nameCtrl, label: "الاسم الكامل", icon: Icons.person),
+                SmartTextField(controller: _phoneCtrl, label: "رقم الهاتف", icon: Icons.phone, type: TextInputType.phone),
               ],
-            ),
+              
+              SmartTextField(controller: _emailCtrl, label: "البريد الإلكتروني", icon: Icons.email, type: TextInputType.emailAddress),
+              SmartTextField(controller: _passCtrl, label: "كلمة المرور", icon: Icons.lock, isPassword: true),
+              
+              const SizedBox(height: 30),
+              
+              ProButton(
+                text: _isLogin ? "تسجيل الدخول" : "إنشاء حساب",
+                onPressed: _submit,
+                isLoading: _loading,
+                icon: _isLogin ? Icons.login : Icons.person_add,
+              ),
+              
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(_isLogin ? "ليس لديك حساب؟" : "لديك حساب بالفعل؟"),
+                  TextButton(
+                    onPressed: () => setState(() => _isLogin = !_isLogin),
+                    child: Text(_isLogin ? "سجل الآن" : "دخول", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  )
+                ],
+              )
+            ],
           ),
         ),
       ),
@@ -570,10 +478,10 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 // ============================================================================
-// 🏠 PART 3: MAIN WRAPPER & HOME SCREEN (الرئيسية والتوجه)
+// 🏠 PART 3: MAIN WRAPPER & PATIENT HOME (الموجه الذكي وواجهة المريض)
 // ============================================================================
 
-// 1. الموجه الرئيسي (Main Wrapper) - يوجه المستخدم حسب رتبته
+// 1. الموجه الذكي (يفرز المستخدمين حسب الرتبة)
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
   @override
@@ -591,11 +499,13 @@ class _MainWrapperState extends State<MainWrapper> {
     _fetchUserRole();
   }
 
-  // معرفة رتبة المستخدم (مريض، ممرض، أدمن)
+  // معرفة رتبة المستخدم وتحديث التوكن
   Future<void> _fetchUserRole() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
+      // جلب الرتبة من قاعدة البيانات
       DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      
       if (doc.exists) {
         setState(() {
           _userRole = doc['role']; // 'admin', 'nurse', 'user'
@@ -607,6 +517,12 @@ class _MainWrapperState extends State<MainWrapper> {
         if (token != null) {
           FirebaseFirestore.instance.collection('users').doc(user.uid).update({'fcm_token': token});
         }
+      } else {
+        // حالة نادرة: المستخدم مسجل في Auth لكن ليس في Firestore
+        setState(() {
+          _userRole = 'user';
+          _loading = false;
+        });
       }
     }
   }
@@ -615,29 +531,27 @@ class _MainWrapperState extends State<MainWrapper> {
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    // توجيه الأدمن والممرض (سنبني شاشاتهم في البارتات القادمة)
-    if (_userRole == 'admin') return const AdminDashboard(); // في البارت 7
-    if (_userRole == 'nurse') return const NurseDashboard(); // في البارت 6
+    // 🔥 هنا الحل لمشكلة اختفاء اللوحات: التوجيه حسب الرتبة
+    if (_userRole == 'admin') return const AdminDashboard(); // سنبنيها في البارت 7
+    if (_userRole == 'nurse') return const NurseDashboard(); // سنبنيها في البارت 6
 
-    // واجهة المريض (Bottom Navigation)
+    // إذا كان مريضاً عادياً، نعرض له شريط التنقل السفلي
     final List<Widget> pages = [
       const PatientHomeScreen(),
-      const RequestsHistoryScreen(), // في البارت 5
-      const ProfileScreen(), // في البارت 8
+      const RequestsHistoryScreen(), // البارت 5
+      const ProfileScreen(), // البارت 8
     ];
 
-    return ConnectivityWrapper(
-      child: Scaffold(
-        body: pages[_navIndex],
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _navIndex,
-          onDestinationSelected: (i) => setState(() => _navIndex = i),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home, color: AppColors.primary), label: "الرئيسية"),
-            NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history, color: AppColors.primary), label: "طلباتي"),
-            NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person, color: AppColors.primary), label: "حسابي"),
-          ],
-        ),
+    return Scaffold(
+      body: pages[_navIndex],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _navIndex,
+        onDestinationSelected: (i) => setState(() => _navIndex = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home, color: AppColors.primary), label: "الرئيسية"),
+          NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history, color: AppColors.primary), label: "طلباتي"),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person, color: AppColors.primary), label: "حسابي"),
+        ],
       ),
     );
   }
@@ -658,14 +572,14 @@ class PatientHomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // الهيدر (الترحيب)
+              // الهيدر والترحيب
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("مرحباً بك 👋", style: TextStyle(color: Colors.grey)),
+                      Text("مرحباً بك 👋", style: TextStyle(color: Colors.grey[600])),
                       Text(user?.displayName ?? "زائر", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                     ],
                   ),
@@ -676,44 +590,31 @@ class PatientHomeScreen extends StatelessWidget {
                   )
                 ],
               ),
-              const SizedBox(height: 20),
-
-              // شريط البحث
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
-                child: const TextField(
-                  decoration: InputDecoration(
-                    hintText: "ابحث عن خدمة، ممرض...",
-                    border: InputBorder.none,
-                    icon: Icon(Icons.search, color: Colors.grey),
-                  ),
-                ),
-              ),
               const SizedBox(height: 25),
 
-              // ✅ استدعاء العروض من الفايربيز مباشرة
-              const Text("عروض حصرية 🔥", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
+              // بنر العروض (يقرأ من السيرفر مباشرة)
               StreamBuilder<DocumentSnapshot>(
                 stream: FirebaseFirestore.instance.collection('config').doc('promo').snapshots(),
                 builder: (context, snapshot) {
-                  // النص الافتراضي
-                  String title = "خصم 20% هذا الأسبوع";
-                  String subtitle = "على جميع الحقن المنزلية";
-                  
+                  // القيم الافتراضية في حال لم يضع الأدمن عرضاً
+                  String title = "خدمة تمريض منزلي";
+                  String subtitle = "نصلك أينما كنت في الجزائر";
+                  bool isActive = false;
+
                   if (snapshot.hasData && snapshot.data!.exists) {
                     var data = snapshot.data!.data() as Map<String, dynamic>;
                     title = data['title'] ?? title;
                     subtitle = data['subtitle'] ?? subtitle;
+                    isActive = true;
                   }
 
                   return Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFFFFD740), Color(0xFFFFAB00)]),
+                      gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
                       borderRadius: BorderRadius.circular(20),
+                      boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
                     ),
                     child: Row(
                       children: [
@@ -721,18 +622,20 @@ class PatientHomeScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(20)),
-                                child: const Text("مكتمل", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              ),
+                              if (isActive)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(20)),
+                                  child: const Text("عرض خاص 🔥", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black)),
+                                ),
                               const SizedBox(height: 10),
-                              Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                              Text(subtitle, style: const TextStyle(color: Colors.white70)),
+                              Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                              Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                             ],
                           ),
                         ),
-                        const Icon(Icons.local_offer, size: 60, color: Colors.white24),
+                        // أيقونة طبية كبيرة شفافة
+                        Icon(Icons.medical_services_outlined, size: 80, color: Colors.white.withOpacity(0.2)),
                       ],
                     ),
                   );
@@ -753,15 +656,16 @@ class PatientHomeScreen extends StatelessWidget {
                 mainAxisSpacing: 15,
                 children: [
                   _ServiceCard(
-                    title: "حقن", 
+                    title: "حقن (Injection)", 
                     price: "500 دج", 
                     icon: Icons.vaccines, 
                     color: Colors.blue[50]!, 
                     iconColor: Colors.blue,
+                    // سنبني صفحة الطلب RequestServiceScreen في البارت 4
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RequestServiceScreen(serviceName: "حقن", basePrice: 500))),
                   ),
                   _ServiceCard(
-                    title: "سيروم", 
+                    title: "سيروم (Serum)", 
                     price: "1500 دج", 
                     icon: Icons.water_drop, 
                     color: Colors.cyan[50]!, 
@@ -794,7 +698,7 @@ class PatientHomeScreen extends StatelessWidget {
   }
 }
 
-// 3. بطاقة الخدمة (مكون صغير)
+// مكون بطاقة الخدمة
 class _ServiceCard extends StatelessWidget {
   final String title;
   final String price;
@@ -820,8 +724,8 @@ class _ServiceCard extends StatelessWidget {
               child: Icon(icon, color: iconColor, size: 30),
             ),
             const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text(price, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            Text(price, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
           ],
         ),
       ),
@@ -829,7 +733,7 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 // ============================================================================
-// 🚑 PART 4: REQUEST SERVICE SCREEN (شاشة طلب الخدمة وتحديد الموقع)
+// 🚑 PART 4: REQUEST SERVICE SCREEN (شاشة طلب الخدمة، الخريطة، والموقع)
 // ============================================================================
 
 class RequestServiceScreen extends StatefulWidget {
@@ -844,11 +748,20 @@ class RequestServiceScreen extends StatefulWidget {
 
 class _RequestServiceScreenState extends State<RequestServiceScreen> {
   final _phoneCtrl = TextEditingController();
-  final _descCtrl = TextEditingController(); // وصف الحالة (مهم للممرض)
+  final _descCtrl = TextEditingController(); 
   String? _selectedWilaya;
   bool _loading = false;
   Position? _currentPosition;
   String _address = "يرجى تحديد موقع المنزل";
+  final MapController _mapController = MapController(); // للتحكم في الخريطة
+
+  // قائمة الولايات (يمكن توسيعها)
+  final List<String> dzWilayas = [
+    "Adrar", "Chlef", "Laghouat", "Oum El Bouaghi", "Batna", "Béjaïa", "Biskra", "Béchar",
+    "Blida", "Bouira", "Tamanrasset", "Tébessa", "Tlemcen", "Tiaret", "Tizi Ouzou", "Algiers",
+    "Djelfa", "Jijel", "Sétif", "Saïda", "Skikda", "Sidi Bel Abbès", "Annaba", "Guelma",
+    "Constantine", "Médéa", "Mostaganem", "M'Sila", "Mascara", "Ouargla", "Oran", "El Bayadh"
+  ];
 
   @override
   void initState() {
@@ -859,9 +772,13 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
   // ملء الهاتف تلقائياً
   void _loadUserData() {
     final user = FirebaseAuth.instance.currentUser;
-    // إذا كان لدينا رقم هاتف محفوظ
-    if (user != null && user.phoneNumber != null) {
-      _phoneCtrl.text = user.phoneNumber!;
+    if (user != null) {
+      // محاولة جلب الهاتف من البروفايل أو الوثيقة
+      FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((doc) {
+        if (doc.exists && doc.data()!.containsKey('phone')) {
+          setState(() => _phoneCtrl.text = doc['phone']);
+        }
+      });
     }
   }
 
@@ -870,7 +787,7 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
     setState(() => _loading = true);
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) throw "خدمة الموقع مغلقة، يرجى تفعيل GPS";
+      if (!serviceEnabled) throw "خدمة الموقع (GPS) مغلقة، يرجى تفعيلها";
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -881,13 +798,15 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
       // جلب الإحداثيات
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       
-      // محاولة تحويل الإحداثيات لاسم مدينة (Geocoding)
+      // تحويل الإحداثيات لاسم مدينة (Reverse Geocoding)
       try {
         List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
         if (placemarks.isNotEmpty) {
-           String? administrativeArea = placemarks.first.administrativeArea; // اسم الولاية
+           Placemark place = placemarks.first;
+           String? administrativeArea = place.administrativeArea; // الولاية
+           
+           // محاولة تحديد الولاية تلقائياً في القائمة
            if (administrativeArea != null) {
-             // محاولة تحديد الولاية تلقائياً
              for (var w in dzWilayas) {
                if (administrativeArea.toLowerCase().contains(w.toLowerCase())) {
                  setState(() => _selectedWilaya = w);
@@ -895,13 +814,18 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
                }
              }
            }
-           setState(() => _address = "${placemarks.first.street}, ${placemarks.first.locality}");
+           setState(() => _address = "${place.street}, ${place.locality}");
         }
       } catch (e) {
         setState(() => _address = "تم تحديد الإحداثيات بنجاح ✅");
       }
 
-      setState(() => _currentPosition = position);
+      setState(() {
+        _currentPosition = position;
+      });
+      
+      // تحريك الخريطة للموقع الجديد
+      _mapController.move(LatLng(position.latitude, position.longitude), 15);
       
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error));
@@ -921,36 +845,41 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
     setState(() => _loading = true);
     try {
       User? user = FirebaseAuth.instance.currentUser;
+      String requestId = const Uuid().v4(); // رقم طلب فريد
       
-      // حفظ الطلب في قاعدة البيانات
-      await FirebaseFirestore.instance.collection('requests').add({
+      // حفظ الطلب
+      await FirebaseFirestore.instance.collection('requests').doc(requestId).set({
+        'id': requestId,
         'service': widget.serviceName,
         'price': widget.basePrice,
         'patient_id': user?.uid,
         'patient_name': user?.displayName ?? "مريض",
         'phone': _phoneCtrl.text,
-        'description': _descCtrl.text, // الملاحظات
+        'description': _descCtrl.text,
         'wilaya': _selectedWilaya,
-        'location': GeoPoint(_currentPosition!.latitude, _currentPosition!.longitude), // الإحداثيات
+        'location': GeoPoint(_currentPosition!.latitude, _currentPosition!.longitude),
         'address': _address,
-        'status': 'pending', // الحالة المبدئية
+        'status': 'pending', // في الانتظار
         'timestamp': FieldValue.serverTimestamp(),
+        'is_emergency': false, // يمكن تفعيلها مستقبلاً
       });
       
       if (mounted) {
+        // نجاح! إظهار رسالة والعودة
         showDialog(
           context: context,
+          barrierDismissible: false,
           builder: (_) => AlertDialog(
-            icon: const Icon(Icons.check_circle, color: AppColors.success, size: 50),
+            icon: const Icon(Icons.check_circle, color: AppColors.success, size: 60),
             title: const Text("تم إرسال الطلب!"),
-            content: const Text("طلبك وصل لجميع الممرضين في منطقتك. انتظر اتصالاً قريباً."),
+            content: const Text("تم إشعار الممرضين في منطقتك. يرجى انتظار قبول الطلب."),
             actions: [
               TextButton(
                 onPressed: () {
                   Navigator.pop(context); // إغلاق الديالوج
                   Navigator.pop(context); // العودة للرئيسية
                 },
-                child: const Text("حسناً"),
+                child: const Text("موافق"),
               )
             ],
           ),
@@ -966,14 +895,14 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("تأكيد طلب ${widget.serviceName}")),
+      appBar: AppBar(title: Text("طلب ${widget.serviceName}")),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             // بطاقة ملخص الخدمة
             GlassCard(
-              color: const Color(0xFF263238),
+              color: AppColors.secondary,
               child: Center(
                 child: Column(
                   children: [
@@ -990,59 +919,80 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 25),
 
-            // حقول الإدخال
+            // الحقول
             SmartTextField(controller: _phoneCtrl, label: "رقم الهاتف للاتصال", icon: Icons.phone, type: TextInputType.phone),
+            SmartTextField(controller: _descCtrl, label: "وصف الحالة (اختياري)", icon: Icons.description, maxLines: 3),
             
-            SmartTextField(
-              controller: _descCtrl, 
-              label: "وصف الحالة (اختياري)", 
-              icon: Icons.description, 
-              maxLines: 3, 
-            ),
-            const Text("مثال: الطابق الثالث، الجرس معطل، حساسية...", style: TextStyle(color: Colors.grey, fontSize: 12)),
             const SizedBox(height: 20),
 
-            // زر الموقع
-            GestureDetector(
-              onTap: _getCurrentLocation,
-              child: Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: Colors.white, 
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: _currentPosition == null ? Colors.grey.shade300 : AppColors.success)
+            // زر تحديد الموقع + الخريطة المصغرة
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _getCurrentLocation,
+                  icon: const Icon(Icons.my_location),
+                  label: Text(_currentPosition == null ? "تحديد موقعي (GPS)" : "تحديث الموقع"),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(15),
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    elevation: 2,
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.location_on, color: _currentPosition == null ? Colors.grey : AppColors.success),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_currentPosition == null ? "تحديد موقع المنزل" : "تم تحديد الموقع", style: const TextStyle(fontWeight: FontWeight.bold)),
-                          if (_currentPosition != null) Text(_address, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                    if (_loading) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  ],
+                const SizedBox(height: 10),
+                
+                // الخريطة (تظهر فقط عند تحديد الموقع)
+                Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: _currentPosition == null 
+                        ? Center(child: Text("لم يتم تحديد الموقع بعد", style: TextStyle(color: Colors.grey[400])))
+                        : FlutterMap(
+                            mapController: _mapController,
+                            options: MapOptions(
+                              initialCenter: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                              initialZoom: 15,
+                            ),
+                            children: [
+                              TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+                              MarkerLayer(markers: [
+                                Marker(
+                                  point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                                )
+                              ]),
+                            ],
+                          ),
+                  ),
                 ),
-              ),
+                if (_address != "يرجى تحديد موقع المنزل")
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text("📍 $_address", style: const TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
+                  ),
+              ],
             ),
-            
+
             const SizedBox(height: 20),
 
             // قائمة الولايات
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 15),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade200)),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   isExpanded: true,
-                  hint: const Text("اختر الولاية"),
+                  hint: const Text("اختر الولاية يدوياً"),
                   value: _selectedWilaya,
                   items: dzWilayas.map((String w) {
                     return DropdownMenuItem<String>(value: w, child: Text(w));
@@ -1054,8 +1004,9 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
 
             const SizedBox(height: 40),
             
+            // زر الإرسال النهائي
             ProButton(
-              text: "إرسال الطلب الآن",
+              text: "تأكيد وإرسال الطلب",
               icon: Icons.send,
               isLoading: _loading,
               onPressed: _submitRequest,
@@ -1067,7 +1018,7 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
   }
 }
 // ============================================================================
-// 📜 PART 5: REQUESTS HISTORY (سجل طلبات المريض)
+// 📜 PART 5: REQUESTS HISTORY (سجل الطلبات وتتبع الحالة)
 // ============================================================================
 
 class RequestsHistoryScreen extends StatelessWidget {
@@ -1080,17 +1031,19 @@ class RequestsHistoryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("طلباتي السابقة")),
       body: StreamBuilder<QuerySnapshot>(
-        // ✅ هذا الكود يستمع للتغييرات في قاعدة البيانات مباشرة
+        // الاستماع المباشر للتغييرات
         stream: FirebaseFirestore.instance
             .collection('requests')
             .where('patient_id', isEqualTo: user?.uid)
             .orderBy('timestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
+          // حالة التحميل
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
+          // حالة القائمة فارغة
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return Center(
               child: Column(
@@ -1104,6 +1057,7 @@ class RequestsHistoryScreen extends StatelessWidget {
             );
           }
 
+          // عرض القائمة
           return ListView.builder(
             padding: const EdgeInsets.all(20),
             itemCount: snapshot.data!.docs.length,
@@ -1111,98 +1065,130 @@ class RequestsHistoryScreen extends StatelessWidget {
               var doc = snapshot.data!.docs[index];
               var data = doc.data() as Map<String, dynamic>;
               
-              // تحديد اللون والنص حسب الحالة
+              // تحديد مظهر البطاقة حسب الحالة
               String status = data['status'] ?? 'pending';
-              Color statusColor = Colors.orange;
+              Color statusColor = AppColors.warning;
               String statusText = "قيد الانتظار ⏳";
 
               if (status == 'accepted') {
-                statusColor = Colors.blue;
+                statusColor = AppColors.info;
                 statusText = "تم القبول (الممرض قادم) 🚑";
-              } else if (status == 'completed') {
-                statusColor = Colors.green;
-                statusText = "مكتمل ✅";
-              } else if (status == 'cancelled') {
-                statusColor = Colors.red;
-                statusText = "ملغي ❌";
               } else if (status == 'on_way') {
                 statusColor = Colors.purple;
-                statusText = "الممرض في الطريق 🚚";
+                statusText = "الممرض في الطريق إليك 🚚";
+              } else if (status == 'completed') {
+                statusColor = AppColors.success;
+                statusText = "مكتمل ✅";
+              } else if (status == 'cancelled') {
+                statusColor = AppColors.error;
+                statusText = "ملغي ❌";
               }
 
-              // تحويل التاريخ من Timestamp لنص مقروء
+              // تنسيق التاريخ
               String dateStr = "الآن";
               if (data['timestamp'] != null) {
                 DateTime date = (data['timestamp'] as Timestamp).toDate();
                 dateStr = intl.DateFormat('yyyy/MM/dd  hh:mm a').format(date);
               }
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 15),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: statusColor.withOpacity(0.3)),
-                  boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)]
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(data['service'] ?? "خدمة", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              return FadeInUp( // أنيميشن دخول جميل
+                duration: Duration(milliseconds: 300 + (index * 100)),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 15),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: statusColor.withOpacity(0.3), width: 1.5),
+                    boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)]
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Column(
+                      children: [
+                        // الرأس: الخدمة والحالة
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(data['service'] ?? "خدمة طبية", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                              child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11)),
+                            )
+                          ],
+                        ),
+                        const Divider(height: 20),
+                        
+                        // التفاصيل
+                        Row(
+                          children: [
+                            const Icon(Icons.attach_money, size: 18, color: Colors.grey),
+                            Text("${data['price']} دج", style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const Spacer(),
+                            const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                            const SizedBox(width: 5),
+                            Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          ],
+                        ),
+
+                        // معلومات الممرض (تظهر فقط إذا تم القبول)
+                        if (data.containsKey('nurse_name') && status != 'pending' && status != 'cancelled') ...[
+                          const SizedBox(height: 10),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                            child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(10)),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.person, size: 20, color: Colors.blue),
+                                const SizedBox(width: 10),
+                                Text("الممرض: ${data['nurse_name']}"),
+                                const Spacer(),
+                                IconButton(
+                                  icon: const Icon(Icons.phone, color: Colors.green),
+                                  onPressed: () async {
+                                    final url = Uri.parse("tel:${data['nurse_phone']}");
+                                    if (await canLaunchUrl(url)) await launchUrl(url);
+                                  },
+                                )
+                              ],
+                            ),
                           )
                         ],
-                      ),
-                      const Divider(height: 20),
-                      Row(
-                        children: [
-                          const Icon(Icons.attach_money, size: 18, color: Colors.grey),
-                          const SizedBox(width: 5),
-                          Text("${data['price']} دج", style: const TextStyle(fontWeight: FontWeight.bold)),
-                          const Spacer(),
-                          const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-                          const SizedBox(width: 5),
-                          Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                        ],
-                      ),
-                      
-                      // زر الإلغاء (يظهر فقط إذا كان الطلب معلقاً)
-                      if (status == 'pending') ...[
-                        const SizedBox(height: 15),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              // تأكيد الإلغاء
-                              bool? confirm = await showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  title: const Text("إلغاء الطلب؟"),
-                                  content: const Text("هل أنت متأكد من إلغاء هذا الطلب؟"),
-                                  actions: [
-                                    TextButton(child: const Text("تراجع"), onPressed: () => Navigator.pop(context, false)),
-                                    TextButton(child: const Text("نعم، الغِ الطلب", style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(context, true)),
-                                  ],
-                                )
-                              );
-                              
-                              if (confirm == true) {
-                                await FirebaseFirestore.instance.collection('requests').doc(doc.id).update({'status': 'cancelled'});
-                              }
-                            },
-                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
-                            child: const Text("إلغاء الطلب"),
-                          ),
-                        )
-                      ]
-                    ],
+                        
+                        // زر الإلغاء (فقط للطلبات المعلقة)
+                        if (status == 'pending') ...[
+                          const SizedBox(height: 15),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.close, size: 18),
+                              label: const Text("إلغاء الطلب"),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.error, 
+                                side: const BorderSide(color: AppColors.error)
+                              ),
+                              onPressed: () async {
+                                bool? confirm = await showDialog(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: const Text("تأكيد الإلغاء"),
+                                    content: const Text("هل أنت متأكد؟ لا يمكن التراجع عن هذا الإجراء."),
+                                    actions: [
+                                      TextButton(child: const Text("تراجع"), onPressed: () => Navigator.pop(context, false)),
+                                      TextButton(child: const Text("نعم، الغِ الطلب", style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(context, true)),
+                                    ],
+                                  )
+                                );
+                                
+                                if (confirm == true) {
+                                  await FirebaseFirestore.instance.collection('requests').doc(doc.id).update({'status': 'cancelled'});
+                                }
+                              },
+                            ),
+                          )
+                        ]
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -1214,7 +1200,7 @@ class RequestsHistoryScreen extends StatelessWidget {
   }
 }
 // ============================================================================
-// 🚑 PART 6: NURSE DASHBOARD (لوحة تحكم الممرض)
+// 🚑 PART 6: NURSE DASHBOARD (لوحة تحكم الممرض، الخرائط، وإدارة المهام)
 // ============================================================================
 
 class NurseDashboard extends StatefulWidget {
@@ -1257,29 +1243,54 @@ class _NurseDashboardState extends State<NurseDashboard> {
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    // إذا لم يكن للممرض ولاية مسجلة
-    if (_nurseWilaya == null) return const Scaffold(body: Center(child: Text("يرجى تحديث ملفك الشخصي وتحديد الولاية")));
+    // إذا لم يكن للممرض ولاية مسجلة، نطلب منه تحديث الملف
+    if (_nurseWilaya == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("لوحة الممرض")),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.warning_amber, size: 60, color: Colors.orange),
+              const SizedBox(height: 20),
+              const Text("يرجى تحديث ملفك الشخصي وتحديد ولاية العمل", style: TextStyle(fontSize: 16)),
+              TextButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())), // البارت 8
+                child: const Text("الذهاب للملف الشخصي"),
+              )
+            ],
+          ),
+        ),
+      );
+    }
 
-    return ConnectivityWrapper(
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(_tabIndex == 0 ? "طلبات الانتظار ($_nurseWilaya)" : "مهامي الحالية"),
-          actions: [
-            IconButton(icon: const Icon(Icons.logout), onPressed: () => FirebaseAuth.instance.signOut().then((_) => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen())))),
-          ],
-        ),
-        body: _tabIndex == 0 
-            ? _AvailableRequestsList(wilaya: _nurseWilaya!) // الطلبات الجديدة
-            : _MyActiveTasksList(), // المهام المقبولة
-        
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _tabIndex,
-          onDestinationSelected: (i) => setState(() => _tabIndex = i),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.list_alt), label: "طلبات جديدة"),
-            NavigationDestination(icon: Icon(Icons.local_hospital), label: "مهامي"),
-          ],
-        ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_tabIndex == 0 ? "طلبات الانتظار ($_nurseWilaya)" : "مهامي النشطة"),
+        actions: [
+          // زر تحديث القائمة يدوياً
+          IconButton(icon: const Icon(Icons.refresh), onPressed: () => setState(() {})),
+        ],
+      ),
+      body: _tabIndex == 0 
+          ? _AvailableRequestsList(wilaya: _nurseWilaya!) // الطلبات الجديدة
+          : _MyActiveTasksList(), // المهام المقبولة
+      
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tabIndex,
+        onDestinationSelected: (i) => setState(() => _tabIndex = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.list_alt_outlined), 
+            selectedIcon: Icon(Icons.list_alt, color: AppColors.primary),
+            label: "طلبات جديدة"
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.local_hospital_outlined), 
+            selectedIcon: Icon(Icons.local_hospital, color: AppColors.primary),
+            label: "مهامي"
+          ),
+        ],
       ),
     );
   }
@@ -1307,7 +1318,7 @@ class _AvailableRequestsList extends StatelessWidget {
               children: [
                 Icon(Icons.check_circle_outline, size: 80, color: Colors.grey[300]),
                 const SizedBox(height: 10),
-                const Text("لا توجد طلبات جديدة في ولايتك حالياً", style: TextStyle(color: Colors.grey)),
+                const Text("لا توجد طلبات جديدة في منطقتك حالياً", style: TextStyle(color: Colors.grey)),
               ],
             ),
           );
@@ -1317,7 +1328,10 @@ class _AvailableRequestsList extends StatelessWidget {
           padding: const EdgeInsets.all(15),
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
-            return _NurseRequestCard(doc: snapshot.data!.docs[index], isMyTask: false);
+            return FadeInUp(
+              duration: Duration(milliseconds: 300 + (index * 100)),
+              child: _NurseRequestCard(doc: snapshot.data!.docs[index], isMyTask: false),
+            );
           },
         );
       },
@@ -1339,7 +1353,9 @@ class _MyActiveTasksList extends StatelessWidget {
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        if (snapshot.data!.docs.isEmpty) return const Center(child: Text("ليس لديك مهام نشطة"));
+        if (snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text("ليس لديك مهام نشطة، اذهب للطلبات الجديدة واقبل واحدة"));
+        }
 
         return ListView.builder(
           padding: const EdgeInsets.all(15),
@@ -1356,14 +1372,16 @@ class _MyActiveTasksList extends StatelessWidget {
 // 3. بطاقة الطلب الذكية للممرض
 class _NurseRequestCard extends StatelessWidget {
   final DocumentSnapshot doc;
-  final bool isMyTask; // هل هذا الطلب في قائمة مهامي أم في الانتظار؟
+  final bool isMyTask;
 
   const _NurseRequestCard({required this.doc, required this.isMyTask});
 
-  // فتح خرائط جوجل
+  // فتح خرائط جوجل للملاحة
   void _openMap(double lat, double lng) async {
     final url = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng");
-    if (await canLaunchUrl(url)) await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
   }
 
   // الاتصال بالمريض
@@ -1378,7 +1396,6 @@ class _NurseRequestCard extends StatelessWidget {
     GeoPoint loc = data['location'];
     String status = data['status'];
     
-    // التحقق من وجود ملاحظة
     bool hasNote = data['description'] != null && data['description'].toString().isNotEmpty;
 
     return Container(
@@ -1390,7 +1407,7 @@ class _NurseRequestCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // 1. الخريطة المصغرة
+          // 1. الخريطة المصغرة (Static Preview)
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             child: SizedBox(
@@ -1400,7 +1417,7 @@ class _NurseRequestCard extends StatelessWidget {
                 options: MapOptions(
                   initialCenter: LatLng(loc.latitude, loc.longitude),
                   initialZoom: 15,
-                  interactionOptions: const InteractionOptions(flags: InteractiveFlag.none), // تعطيل التحريك
+                  interactionOptions: const InteractionOptions(flags: InteractiveFlag.none), // تجميد الخريطة
                 ),
                 children: [
                   TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
@@ -1437,7 +1454,7 @@ class _NurseRequestCard extends StatelessWidget {
 
                 // 3. أزرار التحكم
                 if (!isMyTask)
-                  // زر القبول
+                  // زر القبول (للطلبات الجديدة)
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -1450,29 +1467,26 @@ class _NurseRequestCard extends StatelessWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                       ),
                       onPressed: () async {
-                        // تحديث الحالة لـ "مقبول" وربط الممرض
                         User nurse = FirebaseAuth.instance.currentUser!;
+                        // تحديث حالة الطلب وربطه بالممرض
                         await FirebaseFirestore.instance.collection('requests').doc(doc.id).update({
                           'status': 'accepted',
                           'nurse_id': nurse.uid,
                           'nurse_name': nurse.displayName,
-                          'nurse_phone': nurse.phoneNumber ?? "00000000",
+                          'nurse_phone': nurse.phoneNumber ?? "00000000", // يفضل جلب الهاتف من البروفايل
                         });
                       },
                     ),
                   )
                 else
-                  // أزرار التحكم في المهمة
+                  // أزرار التحكم في المهمة (للمهام النشطة)
                   Row(
                     children: [
-                      // زر الاتصال
                       _CircleBtn(icon: Icons.phone, color: Colors.green, onTap: () => _callPatient(data['phone'])),
                       const SizedBox(width: 10),
-                      // زر الملاحة
-                      _CircleBtn(icon: Icons.map, color: Colors.blue, onTap: () => _openMap(loc.latitude, loc.longitude)),
+                      _CircleBtn(icon: Icons.directions, color: Colors.blue, onTap: () => _openMap(loc.latitude, loc.longitude)),
                       const SizedBox(width: 10),
                       
-                      // زر الملاحظة
                       if (hasNote)
                         _CircleBtn(
                           icon: Icons.sticky_note_2, 
@@ -1483,7 +1497,6 @@ class _NurseRequestCard extends StatelessWidget {
                               builder: (_) => AlertDialog(
                                 title: const Text("ملاحظة المريض"),
                                 content: Text(data['description']),
-                                icon: const Icon(Icons.info, color: Colors.orange),
                               )
                             );
                           }
@@ -1491,11 +1504,14 @@ class _NurseRequestCard extends StatelessWidget {
                         
                       const Spacer(),
 
-                      // زر تغيير الحالة
+                      // زر تغيير الحالة المتتابع
                       Expanded(
                         flex: 2,
                         child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: status == 'accepted' ? Colors.orange : AppColors.primary),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: status == 'accepted' ? Colors.purple : AppColors.success,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                          ),
                           onPressed: () async {
                             if (status == 'accepted') {
                               // تحويل لـ "في الطريق"
@@ -1505,7 +1521,10 @@ class _NurseRequestCard extends StatelessWidget {
                               await FirebaseFirestore.instance.collection('requests').doc(doc.id).update({'status': 'completed'});
                             }
                           },
-                          child: Text(status == 'accepted' ? "أنا في الطريق" : "إنهاء المهمة", style: const TextStyle(color: Colors.white, fontSize: 12)),
+                          child: Text(
+                            status == 'accepted' ? "أنا في الطريق 🚚" : "إنهاء المهمة ✅", 
+                            style: const TextStyle(color: Colors.white, fontSize: 11)
+                          ),
                         ),
                       )
                     ],
@@ -1533,13 +1552,13 @@ class _CircleBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-        child: Icon(icon, color: color, size: 24),
+        child: Icon(icon, color: color, size: 22),
       ),
     );
   }
 }
 // ============================================================================
-// 👮‍♂️ PART 7: ADMIN DASHBOARD (لوحة الإدارة والتحكم الكامل)
+// 👮‍♂️ PART 7: ADMIN DASHBOARD (لوحة التحكم المركزية والإدارة)
 // ============================================================================
 
 class AdminDashboard extends StatefulWidget {
@@ -1552,9 +1571,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   int _index = 0;
 
   final List<Widget> _pages = [
-    const _AdminRequestsView(), // مراقبة الطلبات
-    const _AdminNursesView(),   // إدارة الممرضين
-    const _AdminControlRoom(),  // غرفة التحكم (أسعار + عروض + إشعارات)
+    const _AdminRequestsView(), // مراقبة العمليات
+    const _AdminNursesView(),   // إدارة الموظفين
+    const _AdminControlRoom(),  // التحكم في الأسعار والعروض
   ];
 
   @override
@@ -1566,8 +1585,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout), 
-            onPressed: () => FirebaseAuth.instance.signOut().then((_) => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen())))
+            icon: const Icon(Icons.logout, color: Colors.redAccent), 
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+            },
           ),
         ],
       ),
@@ -1576,7 +1598,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.receipt_long), label: "الطلبات"),
+          NavigationDestination(icon: Icon(Icons.monitor_heart), label: "العمليات"),
           NavigationDestination(icon: Icon(Icons.people_alt), label: "الممرضين"),
           NavigationDestination(icon: Icon(Icons.settings_suggest), label: "التحكم"),
         ],
@@ -1585,7 +1607,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 }
 
-// 1. عرض كل الطلبات (للمراقبة فقط)
+// 1. مراقبة الطلبات (Live Monitor)
 class _AdminRequestsView extends StatelessWidget {
   const _AdminRequestsView();
   @override
@@ -1599,10 +1621,29 @@ class _AdminRequestsView extends StatelessWidget {
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
             var data = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-            return ListTile(
-              title: Text("${data['service']} - ${data['wilaya']}"),
-              subtitle: Text("مريض: ${data['patient_name']} | ممرض: ${data['nurse_name'] ?? '---'}"),
-              trailing: Text(data['status'], style: const TextStyle(fontWeight: FontWeight.bold)),
+            
+            // تحديد لون الحالة
+            Color statusColor = Colors.grey;
+            if (data['status'] == 'pending') statusColor = Colors.orange;
+            if (data['status'] == 'accepted') statusColor = Colors.blue;
+            if (data['status'] == 'completed') statusColor = Colors.green;
+            if (data['status'] == 'cancelled') statusColor = Colors.red;
+
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              child: ListTile(
+                leading: CircleAvatar(backgroundColor: statusColor, child: const Icon(Icons.medical_services, color: Colors.white, size: 15)),
+                title: Text("${data['service']} - ${data['wilaya']}"),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("مريض: ${data['patient_name']}"),
+                    if (data.containsKey('nurse_name')) Text("ممرض: ${data['nurse_name']}", style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                    Text(data['timestamp'] != null ? (data['timestamp'] as Timestamp).toDate().toString().substring(0, 16) : "", style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                  ],
+                ),
+                trailing: Text("${data['price']} دج", style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
             );
           },
         );
@@ -1611,7 +1652,7 @@ class _AdminRequestsView extends StatelessWidget {
   }
 }
 
-// 2. إدارة الممرضين (تفعيل / حظر)
+// 2. إدارة الممرضين (Approve / Block)
 class _AdminNursesView extends StatelessWidget {
   const _AdminNursesView();
 
@@ -1621,24 +1662,29 @@ class _AdminNursesView extends StatelessWidget {
       stream: FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'nurse').snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (snapshot.data!.docs.isEmpty) return const Center(child: Text("لا يوجد ممرضين مسجلين"));
 
         return ListView.builder(
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
             var doc = snapshot.data!.docs[index];
             var data = doc.data() as Map<String, dynamic>;
-            bool isApproved = data['approved'] ?? false;
+            bool isApproved = data['approved'] ?? false; // هل وافق عليه الأدمن؟
 
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               child: ListTile(
-                leading: CircleAvatar(child: Icon(Icons.medical_services, color: isApproved ? Colors.white : Colors.grey), backgroundColor: isApproved ? Colors.green : Colors.grey[300]),
+                leading: CircleAvatar(
+                  backgroundColor: isApproved ? Colors.green : Colors.grey,
+                  child: Icon(isApproved ? Icons.check : Icons.person_off, color: Colors.white),
+                ),
                 title: Text(data['name']),
-                subtitle: Text("${data['wilaya']} - ${data['phone']}"),
+                subtitle: Text("${data['wilaya'] ?? 'بدون ولاية'} - ${data['phone']}"),
                 trailing: Switch(
                   value: isApproved,
                   activeColor: Colors.green,
                   onChanged: (val) {
+                    // تفعيل أو تجميد حساب الممرض
                     FirebaseFirestore.instance.collection('users').doc(doc.id).update({'approved': val});
                   },
                 ),
@@ -1651,7 +1697,7 @@ class _AdminNursesView extends StatelessWidget {
   }
 }
 
-// 3. ⚙️ غرفة التحكم (Control Room)
+// 3. ⚙️ غرفة التحكم (Control Room) - الأخطر والأهم
 class _AdminControlRoom extends StatefulWidget {
   const _AdminControlRoom();
   @override
@@ -1661,7 +1707,6 @@ class _AdminControlRoom extends StatefulWidget {
 class _AdminControlRoomState extends State<_AdminControlRoom> {
   final _promoTitleCtrl = TextEditingController();
   final _promoSubCtrl = TextEditingController();
-  
   final _notifTitleCtrl = TextEditingController();
   final _notifBodyCtrl = TextEditingController();
   
@@ -1671,17 +1716,20 @@ class _AdminControlRoomState extends State<_AdminControlRoom> {
       FirebaseFirestore.instance.collection('config').doc('promo').set({
         'title': _promoTitleCtrl.text,
         'subtitle': _promoSubCtrl.text,
+        'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم تحديث العروض ✅")));
+      
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم تحديث العروض في كل التطبيقات ✅")));
+      _promoTitleCtrl.clear();
+      _promoSubCtrl.clear();
     }
   }
 
-  // إرسال إشعار للجميع
+  // إرسال إشعار عام
   Future<void> _sendBroadcast() async {
     if (_notifTitleCtrl.text.isEmpty || _notifBodyCtrl.text.isEmpty) return;
     
-    // محاكاة إرسال (لأن الإرسال الحقيقي يحتاج Cloud Functions)
-    // هنا سنحفظه في قاعدة البيانات فقط
+    // نحفظ الإشعار في مجموعة خاصة (يمكن ربطها بـ Cloud Functions لاحقاً للإرسال الفعلي)
     await FirebaseFirestore.instance.collection('broadcasts').add({
       'title': _notifTitleCtrl.text,
       'body': _notifBodyCtrl.text,
@@ -1700,7 +1748,8 @@ class _AdminControlRoomState extends State<_AdminControlRoom> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("🏷️ إدارة العروض (البنر)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          // 1. قسم العروض
+          const Text("🏷️ بنر العروض (الشاشة الرئيسية)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           TextField(controller: _promoTitleCtrl, decoration: const InputDecoration(labelText: "العنوان (مثال: خصم 50%)", border: OutlineInputBorder())),
           const SizedBox(height: 10),
@@ -1710,14 +1759,17 @@ class _AdminControlRoomState extends State<_AdminControlRoom> {
           
           const Divider(height: 40),
 
-          const Text("💰 إدارة الأسعار", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const Text("غيّر الأسعار الحالية", style: TextStyle(color: Colors.grey, fontSize: 12)),
+          // 2. قسم الأسعار
+          const Text("💰 تسعير الخدمات", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text("سيتم تحديث الأسعار فوراً لدى جميع المرضى", style: TextStyle(color: Colors.grey, fontSize: 12)),
           const SizedBox(height: 10),
-          _PriceEditRow(label: "سعر الحقن", serviceKey: "injection"),
-          _PriceEditRow(label: "سعر السيروم", serviceKey: "serum"),
+          _PriceEditRow(label: "سعر الحقن (Injection)", serviceKey: "injection"),
+          _PriceEditRow(label: "سعر السيروم (Serum)", serviceKey: "serum"),
+          _PriceEditRow(label: "تغيير ضمادات", serviceKey: "bandage"),
           
           const Divider(height: 40),
 
+          // 3. قسم الإشعارات
           const Text("📢 بث إشعار للجميع", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.purple)),
           const SizedBox(height: 10),
           TextField(controller: _notifTitleCtrl, decoration: const InputDecoration(labelText: "عنوان الإشعار", border: OutlineInputBorder())),
@@ -1731,7 +1783,7 @@ class _AdminControlRoomState extends State<_AdminControlRoom> {
   }
 }
 
-// صف صغير لتعديل السعر
+// مكون صغير لتعديل السعر
 class _PriceEditRow extends StatelessWidget {
   final String label;
   final String serviceKey;
@@ -1751,7 +1803,7 @@ class _PriceEditRow extends StatelessWidget {
             onPressed: () {
               if (ctrl.text.isNotEmpty) {
                 FirebaseFirestore.instance.collection('config').doc('prices').set({serviceKey: int.parse(ctrl.text)}, SetOptions(merge: true));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الحفظ")));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم تحديث السعر ✅")));
               }
             },
           )
@@ -1773,9 +1825,9 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   User? user = FirebaseAuth.instance.currentUser;
   File? _localImage; // لحفظ الصورة المؤقتة من المعرض
-  bool _isFrench = false; // لتغيير اللغة
+  bool _isFrench = false; // لتغيير اللغة (واجهة فقط حالياً)
 
-  // 1. تغيير الاسم
+  // 1. تعديل الاسم
   void _editName() {
     final nameCtrl = TextEditingController(text: user?.displayName);
     showDialog(
@@ -1789,9 +1841,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text("حفظ"),
             onPressed: () async {
               if (nameCtrl.text.isNotEmpty) {
-                // تحديث في فايربيز Auth
+                // تحديث في Auth
                 await user?.updateDisplayName(nameCtrl.text);
-                // تحديث في قاعدة البيانات
+                // تحديث في Firestore
                 await FirebaseFirestore.instance.collection('users').doc(user!.uid).update({'name': nameCtrl.text});
                 
                 await user?.reload();
@@ -1805,7 +1857,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // 2. تغيير الصورة (فتح المعرض)
+  // 2. اختيار صورة من المعرض
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
@@ -1828,7 +1880,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             const SizedBox(height: 20),
             
-            // صورة البروفايل مع زر التعديل
+            // صورة البروفايل
             Center(
               child: Stack(
                 children: [
@@ -1847,7 +1899,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     bottom: 0,
                     right: 0,
                     child: GestureDetector(
-                      onTap: _pickImage, // ✅ فتح المعرض
+                      onTap: _pickImage,
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
@@ -1881,20 +1933,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: EdgeInsets.zero,
               child: Column(
                 children: [
+                  // زر الوضع الليلي
                   SwitchListTile(
                     title: const Text("الوضع الليلي 🌙"),
+                    secondary: const Icon(Icons.dark_mode),
                     value: themeProvider.isDarkMode,
                     onChanged: (val) => themeProvider.toggleTheme(),
                   ),
                   const Divider(height: 1),
+                  // زر اللغة
                   SwitchListTile(
-                    title: const Text("اللغة الفرنسية (Français) 🇫🇷"),
-                    subtitle: const Text("تغيير لغة التطبيق"),
+                    title: const Text("الفرنسية (Français) 🇫🇷"),
+                    secondary: const Icon(Icons.language),
+                    subtitle: const Text("تغيير لغة الواجهة"),
                     value: _isFrench,
                     activeColor: Colors.blue,
                     onChanged: (val) {
                       setState(() => _isFrench = val);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("سيتم إضافة الترجمة الكاملة في التحديث القادم")));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("سيتم تفعيل الترجمة الكاملة قريباً")));
                     },
                   ),
                 ],
@@ -1914,7 +1970,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: const Text("المساعدة والدعم"),
                     subtitle: const Text("تواصل مباشر مع الإدارة"),
                     onTap: () async {
-                      final url = Uri.parse("tel:0697443312"); // رقمك
+                      final url = Uri.parse("tel:0697443312"); // رقم الهاتف
                       if (await canLaunchUrl(url)) await launchUrl(url);
                     },
                   ),
@@ -1932,7 +1988,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             
             const SizedBox(height: 30),
-            Text("V 2.0.0 (Direct Connect Edition)", style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+            Text("V 10.0.0 (Legendary Release)", style: TextStyle(color: Colors.grey[400], fontSize: 12)),
             const SizedBox(height: 50),
           ],
         ),
@@ -1940,3 +1996,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 }
+
+// ======================= END OF MAIN.DART =======================
