@@ -393,13 +393,19 @@ class _SplashScreenState extends State<SplashScreen> {
       try {
         var doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         if (doc.exists) {
-          String role = doc['role'];
+                    // --- كود جديد للأدمن ---
+          var data = doc.data() as Map<String, dynamic>;
+          if (data['email'] == "admin@afya.dz") {
+             if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminDashboard()));
+             return;
+          }
+          // -----------------------
+
+          String role = data['role'];
           if (role == 'patient') {
-            // سنبني MainWrapper في البارت القادم
             if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainWrapper())); 
           } else {
-            // مقدم خدمة (ممرض/طبيب) -> سنوجهه لاحقاً حسب حالته
-             if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProviderMainWrapper())); // سنبنيها لاحقاً
+             if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProviderMainWrapper()));
           }
         } else {
            if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OnboardingScreen()));
@@ -614,12 +620,14 @@ class _AuthScreenState extends State<AuthScreen> {
         await cred.user!.updateDisplayName(_nameCtrl.text);
 
         // 4. التوجيه
-        if (_selectedRole == 'patient') {
-          // المريض -> الرئيسية
+                // 4. التوجيه (معدل للأدمن)
+        if (_emailCtrl.text.trim() == "admin@afya.dz") {
+             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminDashboard()));
+        } 
+        else if (_selectedRole == 'patient') {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainWrapper()));
         } else {
-          // الموظف -> رفع الوثائق (البارت 3)
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProviderDocsUploadScreen()));
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProviderMainWrapper()));
         }
 
       } else {
