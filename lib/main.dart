@@ -98,11 +98,15 @@ void main() async {
   runApp(const AfyaAppV10());
 }
 
-// 4. الألوان الطبية (V10 Palette)
+// 4. الألوان الطبية (V10 Palette) - المصححة
 class AppColors {
   static const Color primary = Color(0xFF009688); // Teal Medical
   static const Color primaryDark = Color(0xFF00796B);
   static const Color accent = Color(0xFFFFC107); // Amber for alerts
+  
+  // ✅✅ هذا هو السطر الذي كان ناقصاً وتسبب في الخطأ
+  static const Color secondary = Color(0xFF263238); 
+
   static const Color backgroundLight = Color(0xFFF5F7FA);
   static const Color backgroundDark = Color(0xFF121212);
   static const Color success = Color(0xFF4CAF50);
