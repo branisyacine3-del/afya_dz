@@ -1,4 +1,4 @@
-name: Afya
+name: afya_dz
 description: The Ultimate Healthcare App.
 publish_to: 'none'
 version: 2.0.0+1
@@ -14,7 +14,6 @@ dependencies:
   firebase_core: ^2.27.0
   firebase_auth: ^4.17.8
   cloud_firestore: ^4.15.8
-  # ✅ جديد: مكتبة الإشعارات السحابية
   firebase_messaging: ^14.7.19
 
   # --- 2. الأدوات والاتصال (Utilities & Network) ---
@@ -23,11 +22,8 @@ dependencies:
   image_picker: ^1.0.7
   shared_preferences: ^2.2.2
   uuid: ^4.3.3
-  # ✅ جديد: مكتبة مراقبة الإنترنت
   connectivity_plus: ^6.0.3
-  # ✅ جديد: لإرسال طلبات الإشعارات (HTTP)
   http: ^1.2.1
-  # ✅ جديد: لإظهار الإشعارات داخل الهاتف
   flutter_local_notifications: ^17.1.2
 
   # --- 3. التصميم والخرائط (UI & Maps) ---
@@ -39,13 +35,12 @@ dependencies:
   geolocator: ^11.0.0
   geocoding: ^3.0.0
 
-  # --- 4. أيقونة التطبيق ---
-  flutter_launcher_icons: ^0.13.1
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  # --- 4. أيقونة التطبيق ---
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -54,5 +49,6 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
+  # تم إرجاع اسم الصورة كما طلبت
   image_path: "Picsart_26-01-15_11-27-34-308.png"
   min_sdk_android: 21
