@@ -51,7 +51,7 @@ class PatientHome extends StatelessWidget {
                 children: [
                   _srvBtn(context, "تمريض منزلي", Icons.medical_services, Colors.teal, 'nurse'),
                   _srvBtn(context, "طبيب عام", Icons.person, Colors.blue, 'doctor'),
-                  _srvBtn(context, "سيارة إسعاف", Icons.ambulance, Colors.red, 'ambulance'),
+                  _srvBtn(context, "سيارة إسعاف", Icons.local_shipping, Colors.red, 'ambulance'),
                   _srvBtn(context, "رعاية مسنين", Icons.elderly, Colors.orange, 'elderly'),
                 ],
               ),
