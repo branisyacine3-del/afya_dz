@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart'; // مكتبة الاتصال ضرورية هنا
 
 // 🏠 الشاشة الرئيسية للمريض
 class PatientHome extends StatelessWidget {
   const PatientHome({super.key});
+
+  // ✅ دالة الاتصال بالدعم (كما طلبتها)
+  void _callSupport() async {
+    final Uri url = Uri.parse('tel:0562898252'); // رقم الدعم المباشر
+    if (!await launchUrl(url)) {
+      debugPrint('Could not launch $url');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +31,13 @@ class PatientHome extends StatelessWidget {
           ),
         ],
       ),
+      // ✅ زر عائم للاتصال بالدعم في أي وقت
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _callSupport,
+        backgroundColor: Colors.green,
+        icon: const Icon(Icons.phone),
+        label: const Text("اتصل بالدعم"),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -35,7 +51,12 @@ class PatientHome extends StatelessWidget {
               ),
               child: const Row(
                 children: [
-                  Expanded(child: Text("مرحباً بك ❤️\nاختر الخدمة التي تحتاجها وسنصلك فوراً.", style: TextStyle(color: Colors.white, fontSize: 16))),
+                  Expanded(
+                    child: Text(
+                      "مرحباً بك ❤️\nاختر الخدمة التي تحتاجها وسنصلك فوراً.",
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
                   Icon(Icons.favorite, color: Colors.white, size: 40),
                 ],
               ),
@@ -51,6 +72,7 @@ class PatientHome extends StatelessWidget {
                 children: [
                   _srvBtn(context, "تمريض منزلي", Icons.medical_services, Colors.teal, 'nurse'),
                   _srvBtn(context, "طبيب عام", Icons.person, Colors.blue, 'doctor'),
+                  // ✅ تم تصحيح الأيقونة لتجنب الخطأ السابق
                   _srvBtn(context, "سيارة إسعاف", Icons.local_shipping, Colors.red, 'ambulance'),
                   _srvBtn(context, "رعاية مسنين", Icons.elderly, Colors.orange, 'elderly'),
                 ],
@@ -92,7 +114,7 @@ class PatientHome extends StatelessWidget {
   }
 }
 
-// 📄 قائمة اختيار الخدمة الفرعية (حقن، سيروم...)
+// 📄 قائمة اختيار الخدمة الفرعية والأسعار
 class ServiceSelectionSheet extends StatelessWidget {
   final String type;
   final String title;
@@ -105,23 +127,25 @@ class ServiceSelectionSheet extends StatelessWidget {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         
-        // جلب الأسعار من الأدمن
-        Map<String, dynamic> prices = snapshot.data!.data() as Map<String, dynamic>;
+        // جلب الأسعار من الأدمن (مع حماية ضد القيم الفارغة)
+        Map<String, dynamic> prices = snapshot.data!.data() as Map<String, dynamic>? ?? {};
         
         List<Map<String, dynamic>> list = [];
         if (type == 'nurse') {
           list = [
-            {'name': 'حقن (Injection)', 'price': prices['nurse_injection']},
-            {'name': 'سيروم (Sérum)', 'price': prices['nurse_serum']},
-            {'name': 'تغيير ضمادات', 'price': prices['nurse_change']},
+            {'name': 'حقن (Injection)', 'price': prices['nurse_injection'] ?? 500},
+            {'name': 'سيروم (Sérum)', 'price': prices['nurse_serum'] ?? 1500},
+            {'name': 'تغيير ضمادات', 'price': prices['nurse_change'] ?? 800},
           ];
         } else if (type == 'doctor') {
-          list = [{'name': 'زيارة منزلية', 'price': prices['doctor_visit']}];
+          list = [{'name': 'زيارة منزلية', 'price': prices['doctor_visit'] ?? 3000}];
         } else if (type == 'ambulance') {
           list = [
-            {'name': 'نقل داخل الولاية', 'price': prices['ambulance_local']},
-            {'name': 'نقل خارج الولاية', 'price': prices['ambulance_out']},
+            {'name': 'نقل داخل الولاية', 'price': prices['ambulance_local'] ?? 2000},
+            {'name': 'نقل خارج الولاية', 'price': prices['ambulance_out'] ?? 10000},
           ];
+        } else if (type == 'elderly') {
+           list = [{'name': 'رعاية يومية', 'price': prices['elderly_care'] ?? 2500}];
         }
 
         return Container(
@@ -176,20 +200,27 @@ class _OrderFormState extends State<OrderForm> {
     setState(() => _isLoading = true);
     final user = FirebaseAuth.instance.currentUser;
 
-    await FirebaseFirestore.instance.collection('requests').add({
-      'patientId': user!.uid,
-      'patientPhone': user.phoneNumber,
-      'service': widget.service,
-      'price': widget.price,
-      'address': _addressCtrl.text,
-      'status': 'pending', // حالة الانتظار
-      'created_at': FieldValue.serverTimestamp(),
-      'location': const GeoPoint(36.7, 3.0), // موقع افتراضي مؤقتاً
-    });
+    try {
+      await FirebaseFirestore.instance.collection('requests').add({
+        'patientId': user!.uid,
+        'patientPhone': user.phoneNumber,
+        'service': widget.service,
+        'price': widget.price,
+        'address': _addressCtrl.text,
+        'status': 'pending', // حالة الانتظار
+        'created_at': FieldValue.serverTimestamp(),
+        'location': const GeoPoint(36.7, 3.0), // موقع افتراضي (يمكن تطويره لاحقاً)
+      });
 
-    if (mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم إرسال الطلب بنجاح! 🚑")));
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم إرسال الطلب بنجاح! 🚑")));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e")));
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -207,6 +238,7 @@ class _OrderFormState extends State<OrderForm> {
             TextField(
               controller: _addressCtrl,
               decoration: const InputDecoration(labelText: "العنوان بالتفصيل (الحي، رقم المنزل..)", prefixIcon: Icon(Icons.location_on)),
+              maxLines: 2,
             ),
             const Spacer(),
             SizedBox(
@@ -244,14 +276,16 @@ class PatientHistory extends StatelessWidget {
             itemBuilder: (ctx, i) {
               var data = snapshot.data!.docs[i].data() as Map<String, dynamic>;
               String status = data['status'];
+              // تلوين الحالة
               Color color = status == 'pending' ? Colors.orange : (status == 'accepted' ? Colors.blue : Colors.green);
+              String statusText = status == 'pending' ? 'قيد الانتظار' : (status == 'accepted' ? 'تم القبول (الممرض قادم)' : 'مكتملة');
 
               return Card(
                 margin: const EdgeInsets.all(10),
                 child: ListTile(
                   leading: CircleAvatar(backgroundColor: color, child: const Icon(Icons.history, color: Colors.white)),
                   title: Text(data['service']),
-                  subtitle: Text("${data['price']} دج • $status"),
+                  subtitle: Text("${data['price']} دج • $statusText"),
                 ),
               );
             },
