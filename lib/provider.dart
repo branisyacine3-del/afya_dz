@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart'; // للاتصال بالدعم
 
-// 🛡️ البوابة الرئيسية للممرض (تفحص حالته قبل الدخول)
+// 🛡️ البوابة الرئيسية للممرض
 class ProviderDashboard extends StatelessWidget {
   const ProviderDashboard({super.key});
 
@@ -16,7 +17,6 @@ class ProviderDashboard extends StatelessWidget {
         if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
         var data = snapshot.data!.data() as Map<String, dynamic>?;
-        // الحالة الافتراضية إذا لم تكن موجودة
         String status = data != null && data.containsKey('verification_status') 
             ? data['verification_status'] 
             : 'pending_registration';
@@ -24,108 +24,95 @@ class ProviderDashboard extends StatelessWidget {
         // 1. لم يسجل بياناته بعد
         if (status == 'pending_registration') return const ProviderRegistrationScreen();
 
-        // 2. بانتظار موافقة الإدارة (أنت)
-        if (status == 'pending') {
-          return Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(30),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.hourglass_top, size: 80, color: Colors.orange),
-                    const SizedBox(height: 20),
-                    const Text("الحساب قيد المراجعة", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    const Text("نحن نراجع وثائقك حالياً. سيتم تفعيل حسابك قريباً.", textAlign: TextAlign.center),
-                    const SizedBox(height: 30),
-                    ElevatedButton(onPressed: () => FirebaseAuth.instance.signOut(), child: const Text("خروج")),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
+        // 2. بانتظار موافقة الإدارة على الوثائق
+        if (status == 'pending') return const PendingApprovalScreen();
 
-        // 3. تم الرفض
-        if (status == 'rejected') {
-          return Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.block, size: 80, color: Colors.red),
-                  const Text("عذراً، تم رفض الطلب."),
-                  TextButton(onPressed: () => FirebaseAuth.instance.signOut(), child: const Text("خروج")),
-                ],
-              ),
-            ),
-          );
-        }
+        // 3. 💰 مرحلة الدفع (جديد): الوثائق مقبولة لكن يجب دفع الاشتراك
+        if (status == 'pending_payment') return const SubscriptionPaymentScreen();
 
-        // 4. مقبول (Approved) -> يدخل للعمل
+        // 4. تم الرفض
+        if (status == 'rejected') return const RejectedScreen();
+
+        // 5. حساب مفعل (Active) -> يدخل للعمل
         return const ProviderWorkspace();
       },
     );
   }
 }
 
-// 📝 شاشة التسجيل ورفع الوثائق
-class ProviderRegistrationScreen extends StatefulWidget {
-  const ProviderRegistrationScreen({super.key});
+// 💰 شاشة دفع الاشتراك (مع معلوماتك)
+class SubscriptionPaymentScreen extends StatelessWidget {
+  const SubscriptionPaymentScreen({super.key});
 
-  @override
-  State<ProviderRegistrationScreen> createState() => _ProviderRegistrationScreenState();
-}
-
-class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen> {
-  final _nameCtrl = TextEditingController();
-  final _ccpCtrl = TextEditingController();
-  bool _isLoading = false;
-
-  Future<void> _submit() async {
-    if (_nameCtrl.text.isEmpty || _ccpCtrl.text.isEmpty) return;
-
-    setState(() => _isLoading = true);
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-
-    await FirebaseFirestore.instance.collection('users').doc(uid).update({
-      'name': _nameCtrl.text,
-      'ccp_number': _ccpCtrl.text,
-      'verification_status': 'pending', // يذهب للمراجعة
-      'wallet_balance': 0.0,
-      'total_earnings': 0.0,
-    });
-    // StreamBuilder سيعيد تحميل الصفحة تلقائياً
+  void _callSupport() async {
+    final Uri url = Uri.parse('tel:0562898252'); // رقمك للدعم
+    if (!await launchUrl(url)) {
+      debugPrint('Could not launch $url');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("توثيق الحساب")),
-      body: Padding(
+      appBar: AppBar(title: const Text("تفعيل الاشتراك"), backgroundColor: Colors.indigo),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const Text("أكمل بياناتك لنبدأ العمل 🚑", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Icon(Icons.verified_user, size: 80, color: Colors.green),
+            const SizedBox(height: 10),
+            const Text("مبروك! تمت الموافقة على وثائقك 🎉", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-            TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: "الاسم الكامل")),
-            const SizedBox(height: 15),
-            TextField(controller: _ccpCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "رقم CCP")),
-            const SizedBox(height: 30),
-            // محاكاة زر رفع الصورة
+            
             Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(10)),
-              child: const Row(children: [Icon(Icons.upload_file), SizedBox(width: 10), Text("رفع صورة الدبلوم + البطاقة")]),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.orange),
+              ),
+              child: Column(
+                children: [
+                  const Text("لتفعيل حسابك وبدء استقبال الطلبات، يجب دفع اشتراك الشهر الأول.", textAlign: TextAlign.center),
+                  const Divider(),
+                  const Text("قيمة الاشتراك: 3500 دج / شهرياً", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.indigo)),
+                ],
+              ),
             ),
-            const Spacer(),
+            const SizedBox(height: 20),
+            
+            // معلومات الـ CCP الخاصة بك
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("معلومات الدفع (CCP):", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Divider(),
+                    _rowInfo("الاسم:", "Branis Yacine"),
+                    _rowInfo("CCP:", "0028939081"),
+                    _rowInfo("Clé:", "97"),
+                    const Divider(),
+                    const Text("BaridiMob (RIP):", style: TextStyle(fontWeight: FontWeight.bold)),
+                    SelectableText("00799999002893908197", style: TextStyle(fontSize: 16, color: Colors.blue.shade800, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+            const Text("بعد الدفع، اتصل بالدعم لإرسال الوصل وتفعيل الحساب فوراً.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               height: 50,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _submit,
-                child: _isLoading ? const CircularProgressIndicator() : const Text("إرسال للمراجعة 🚀"),
+              child: ElevatedButton.icon(
+                onPressed: _callSupport,
+                icon: const Icon(Icons.call),
+                label: const Text("اتصل لتأكيد الدفع (0562898252)"),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
               ),
             ),
           ],
@@ -133,149 +120,110 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
       ),
     );
   }
+
+  Widget _rowInfo(String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: const TextStyle(color: Colors.grey)),
+          SelectableText(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        ],
+      ),
+    );
+  }
 }
 
-// 🚑 مساحة العمل (الرادار والمهام)
-class ProviderWorkspace extends StatefulWidget {
-  const ProviderWorkspace({super.key});
+// ... (باقي الشاشات: التسجيل، الانتظار، الرفض)
+class ProviderRegistrationScreen extends StatefulWidget {
+  const ProviderRegistrationScreen({super.key});
+  @override
+  State<ProviderRegistrationScreen> createState() => _ProviderRegistrationScreenState();
+}
+
+class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen> {
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _submit() async {
+    if (_nameCtrl.text.isEmpty) return;
+    setState(() => _isLoading = true);
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      'name': _nameCtrl.text,
+      'phone_contact': _phoneCtrl.text,
+      'verification_status': 'pending', 
+    });
+  }
 
   @override
-  State<ProviderWorkspace> createState() => _ProviderWorkspaceState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("التسجيل")),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Text("سجل بياناتك للانضمام", style: TextStyle(fontSize: 20)),
+            TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: "الاسم الكامل")),
+            const SizedBox(height: 20),
+            // زر وهمي لرفع الوثائق
+            Container(height: 100, color: Colors.grey.shade200, child: const Center(child: Text("رفع صورة الدبلوم + البطاقة"))),
+            const Spacer(),
+            ElevatedButton(onPressed: _isLoading ? null : _submit, child: const Text("إرسال للمراجعة")),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _ProviderWorkspaceState extends State<ProviderWorkspace> {
-  final uid = FirebaseAuth.instance.currentUser!.uid;
-  int _tabIndex = 0;
-
-  // قبول الطلب
-  Future<void> _accept(String reqId) async {
-    try {
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        DocumentReference ref = FirebaseFirestore.instance.collection('requests').doc(reqId);
-        DocumentSnapshot snap = await transaction.get(ref);
-        
-        if (!snap.exists || snap['status'] != 'pending') throw Exception("راح عليك الطلب!");
-        
-        transaction.update(ref, {
-          'status': 'accepted',
-          'providerId': uid,
-          'acceptedAt': FieldValue.serverTimestamp(),
-        });
-      });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم القبول! انطلق 🚑")));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("سبقك إليها ممرض آخر")));
-    }
+class PendingApprovalScreen extends StatelessWidget {
+  const PendingApprovalScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.hourglass_top, size: 80, color: Colors.orange),
+            const SizedBox(height: 20),
+            const Text("جاري مراجعة الوثائق...", style: TextStyle(fontSize: 20)),
+            TextButton(onPressed: () => FirebaseAuth.instance.signOut(), child: const Text("خروج")),
+          ],
+        ),
+      ),
+    );
   }
+}
 
-  // إنهاء واحتساب العمولة
-  Future<void> _complete(String reqId, int price) async {
-    double commission = price * 0.20; // 20% عمولة
-    double profit = price - commission;
-
-    await FirebaseFirestore.instance.collection('requests').doc(reqId).update({'status': 'completed'});
-    
-    // تحديث المحفظة
-    await FirebaseFirestore.instance.collection('users').doc(uid).update({
-      'wallet_balance': FieldValue.increment(profit),
-      'total_earnings': FieldValue.increment(profit),
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("مبروك! ربحت $profit دج")));
+class RejectedScreen extends StatelessWidget {
+  const RejectedScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(child: Text("تم رفض الطلب. اتصل بالدعم.")),
+    );
   }
+}
+
+// 🚑 مساحة العمل (تعمل فقط بعد الدفع والتفعيل)
+class ProviderWorkspace extends StatelessWidget {
+  const ProviderWorkspace({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("مساحة العمل"),
-        backgroundColor: Colors.indigo,
-        actions: [
-          StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
-            builder: (ctx, snap) {
-              if (!snap.hasData) return const SizedBox();
-              var balance = snap.data!['wallet_balance'] ?? 0;
-              return Center(child: Padding(padding: const EdgeInsets.all(10), child: Text("رصيدك: $balance دج")));
-            },
-          ),
-          IconButton(onPressed: () => FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
-        ],
+        actions: [IconButton(onPressed: () => FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout))],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tabIndex,
-        onTap: (i) => setState(() => _tabIndex = i),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.radar), label: "الرادار"),
-          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: "مهامي"),
-        ],
+      body: const Center(
+        child: Text("أهلاً بك! اشتراكك مفعل ✅\nاستقبل الطلبات الآن.", textAlign: TextAlign.center, style: TextStyle(fontSize: 20)),
       ),
-      body: _tabIndex == 0 ? _buildRadar() : _buildMyTasks(),
-    );
-  }
-
-  // الرادار: طلبات الانتظار
-  Widget _buildRadar() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('requests').where('status', isEqualTo: 'pending').snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        if (snapshot.data!.docs.isEmpty) return const Center(child: Text("جاري البحث عن طلبات... 📡"));
-
-        return ListView.builder(
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (ctx, i) {
-            var data = snapshot.data!.docs[i].data() as Map<String, dynamic>;
-            return Card(
-              color: Colors.orange.shade50,
-              margin: const EdgeInsets.all(10),
-              child: ListTile(
-                title: Text(data['service']),
-                subtitle: Text("${data['address']} • ${data['price']} دج"),
-                trailing: ElevatedButton(
-                  onPressed: () => _accept(snapshot.data!.docs[i].id),
-                  child: const Text("قبول"),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // مهامي: المقبولة
-  Widget _buildMyTasks() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('requests')
-          .where('providerId', isEqualTo: uid)
-          .where('status', isEqualTo: 'accepted')
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        if (snapshot.data!.docs.isEmpty) return const Center(child: Text("ليس لديك مهام حالياً"));
-
-        return ListView.builder(
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (ctx, i) {
-            var data = snapshot.data!.docs[i].data() as Map<String, dynamic>;
-            return Card(
-              color: Colors.green.shade50,
-              margin: const EdgeInsets.all(10),
-              child: ListTile(
-                title: Text(data['service']),
-                subtitle: Text(data['address']),
-                trailing: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                  onPressed: () => _complete(snapshot.data!.docs[i].id, data['price']),
-                  child: const Text("إنهاء"),
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }
