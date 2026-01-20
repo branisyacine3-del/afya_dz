@@ -1,4 +1,4 @@
-name: Build Afya App
+name: Fix Android V2 Embedding
 
 on:
   push:
@@ -9,36 +9,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. جلب الكود
+    # 1. جلب الملفات
     - uses: actions/checkout@v4
 
-    # 2. تجهيز الجافا
+    # 2. إعداد الجافا
     - uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
         java-version: '17'
 
-    # 3. تجهيز فلاتر
+    # 3. إعداد فلاتر
     - uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.19.0'
 
-    # 4. 🔥 الخطوة السحرية: تجديد ملفات الأندرويد (Fix V2 Embedding)
-    - name: Recreate Android Project
+    # 4. 🔥 الخطوة الحاسمة: إعادة بناء مجلد أندرويد ليتوافق مع V2
+    - name: Recreate Android Folder (Fix V2 Error)
       run: |
-        # نحتفظ بملف مفتاح فايربيز جانباً
+        # نحفظ المفتاح جانباً
         mv android/app/google-services.json .
         
-        # نحذف مجلد أندرويد القديم والمشاكل معه
+        # نحذف مجلد أندرويد القديم (سبب المشكلة)
         rm -rf android
         
-        # نأمر فلاتر بإنشاء مجلد أندرويد جديد وحديث 100%
-        flutter create . --org com.yacine.afya_dz --project-name afya_dz --platform android
+        # ننشئ مجلد أندرويد جديد وحديث
+        flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # نعيد ملف المفتاح لمكانه
+        # نعيد المفتاح لمكانه
         mv google-services.json android/app/
 
-    # 5. إضافة إذن الإنترنت تلقائياً (بدون تدخل يدوي)
+    # 5. إضافة إذن الإنترنت الذي يختفي عند إعادة البناء
     - name: Inject Internet Permission
       run: |
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
@@ -51,10 +51,9 @@ jobs:
     - name: Build APK
       run: flutter build apk --release --no-tree-shake-icons
 
-    # 8. الرفع
+    # 8. حفظ التطبيق الجديد
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-app-v2
+        name: afya-fixed-v2
         path: build/app/outputs/flutter-apk/app-release.apk
- 
