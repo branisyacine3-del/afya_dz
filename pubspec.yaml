@@ -1,5 +1,5 @@
 name: afya_dz
-description: Afya DZ App - Professional Medical Services.
+description: Afya DZ App - UI Version.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -10,15 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # مكتبات فايربيز (إصدارات مستقرة)
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.16.0
-  cloud_firestore: ^4.14.0
-  
-  # مكتبة لفتح رابط الواتساب والاتصال
+  # ✅ نبقي هذه فقط (آمنة)
   url_launcher: ^6.2.1
-  
-  # أيقونات عصرية
   cupertino_icons: ^1.0.2
 
 dev_dependencies:
@@ -28,5 +21,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # 🛑 لا تضع صوراً هنا (assets) لنتجنب المشاكل حالياً
- 
