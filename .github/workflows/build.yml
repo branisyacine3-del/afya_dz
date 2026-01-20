@@ -1,4 +1,4 @@
-name: Fix Android V2 Embedding
+name: Full Repair Build
 
 on:
   push:
@@ -23,37 +23,37 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    # 4. 🔥 الخطوة الحاسمة: إعادة بناء مجلد أندرويد ليتوافق مع V2
-    - name: Recreate Android Folder (Fix V2 Error)
+    # 4. 🔥 العملية الجراحية: تجديد ملفات الأندرويد وإصلاح خطأ V2
+    - name: Recreate Android Project & Fix Permissions
       run: |
-        # نحفظ المفتاح جانباً
+        # 1. نحتفظ بالمفتاح
         mv android/app/google-services.json .
         
-        # نحذف مجلد أندرويد القديم (سبب المشكلة)
+        # 2. نحذف المجلد القديم
         rm -rf android
         
-        # ننشئ مجلد أندرويد جديد وحديث
+        # 3. ننشئ مجلداً جديداً حديثاً
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # نعيد المفتاح لمكانه
+        # 4. نعيد المفتاح
         mv google-services.json android/app/
-
-    # 5. إضافة إذن الإنترنت الذي يختفي عند إعادة البناء
-    - name: Inject Internet Permission
-      run: |
+        
+        # 5. 🔥 أهم خطوة: إضافة إذن الإنترنت للملف الجديد
+        # هذا الأمر يبحث عن وسم التطبيق ويضيف قبله إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
 
-    # 6. تحميل المكتبات
+    # 5. تحميل المكتبات
     - name: Get dependencies
       run: flutter pub get
 
-    # 7. بناء التطبيق
+    # 6. بناء التطبيق
     - name: Build APK
       run: flutter build apk --release --no-tree-shake-icons
 
-    # 8. حفظ التطبيق الجديد
+    # 7. الرفع
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-fixed-v2
+        name: afya-final-fix
         path: build/app/outputs/flutter-apk/app-release.apk
+ 
