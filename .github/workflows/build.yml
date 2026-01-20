@@ -3,45 +3,40 @@ name: Build Android App
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-      
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.19.0'
-      
-      # ✅✅ التغيير الجوهري: إجبار السيرفر على تسمية التطبيق باسمك الخاص ✅✅
-      # سيتم إنشاء التطبيق بالاسم: com.yacine.afya
-      - run: flutter create --org com.yacine --project-name afya .
-      
-      # ✅✅ وضع ملف فايربيز (جواز السفر) في مكانه ✅✅
-      - name: Create google-services.json
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > android/app/google-services.json
+    # 1. جلب الكود من GitHub
+    - uses: actions/checkout@v4
 
-      # أوامر الإصلاح والتحسين
-      - run: |
-          sed -i 's/compileSdkVersion .*/compileSdkVersion 34/g' android/app/build.gradle
-          sed -i 's/targetSdkVersion .*/targetSdkVersion 34/g' android/app/build.gradle
-          sed -i 's/minSdkVersion .*/minSdkVersion 23/g' android/app/build.gradle
-          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.0"/g' android/build.gradle
-          sed -i 's/id "org.jetbrains.kotlin.android" version .*/id "org.jetbrains.kotlin.android" version "1.9.0" apply false/g' android/settings.gradle
-          sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' android/app/src/main/AndroidManifest.xml
-          sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
+    # 2. إعداد بيئة جافا
+    - uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
 
-      - run: flutter pub get
-      - run: dart run flutter_launcher_icons
-      - run: flutter build apk --release --no-tree-shake-icons
-      
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+    # 3. إعداد بيئة Flutter (أحدث نسخة مستقرة)
+    - uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        channel: 'stable'
+
+    # 4. تحميل المكتبات (بدون أيقونات)
+    - name: Get dependencies
+      run: flutter pub get
+
+    # 5. بناء التطبيق (APK)
+    # ملاحظة: ألغينا خطوة الأيقونات وخطوة ملف google-services لأنك رفعته يدوياً
+    - name: Build APK
+      run: flutter build apk --release --no-tree-shake-icons
+
+    # 6. رفع التطبيق لكي تحمله أنت
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-apk
+        path: build/app/outputs/flutter-apk/app-release.apk
+ 
