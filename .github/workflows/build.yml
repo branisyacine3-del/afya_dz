@@ -1,4 +1,4 @@
-name: Force Legacy Fix
+name: Full Replacement Fix
 
 on:
   push:
@@ -20,35 +20,53 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Reset & Force Injection
+    - name: Reset & Overwrite Configs
       run: |
         # 1. 🕵️‍♂️ إنقاذ المفتاح
         if [ -f android/app/src/main/google-services.json ]; then
-          echo "Key found in src/main"
           mv android/app/src/main/google-services.json .
         elif [ -f android/app/google-services.json ]; then
-          echo "Key found in app root"
           mv android/app/google-services.json .
-        else
-          echo "⚠️ Warning: No key found!"
         fi
         
-        # 2. 🧹 هدم وبناء
+        # 2. 🧹 إنشاء مشروع نظيف
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 3. 🔙 استرجاع المفتاح
+        # 3. 🔙 إعادة المفتاح
         mv google-services.json android/app/
         
-        # 4. 🔥 الزرع الإجباري (Force Injection)
-        # نقوم بإنشاء ملف مؤقت يحتوي على تعريف فايربيز، ثم ندمجه مع الملف الأصلي
-        # هذا يضمن أن يكون التعريف في السطر الأول ولا يتأثر بالتحديثات
-        echo 'buildscript { repositories { google(); mavenCentral() } dependencies { classpath "com.google.gms:google-services:4.4.1" } }' > android/temp_build.gradle
-        cat android/build.gradle >> android/temp_build.gradle
-        mv android/temp_build.gradle android/build.gradle
-        
-        # 5. 🔥 تفعيل البلوجن في التطبيق (أسهل طريقة)
-        echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+        # 4. 🔥 استبدال ملف settings.gradle بالكامل (فيه تعريف فايربيز)
+        rm android/settings.gradle
+        cat > android/settings.gradle <<EOF
+        pluginManagement {
+            def flutterSdkPath = {
+                def properties = new Properties()
+                file("local.properties").withInputStream { properties.load(it) }
+                def flutterSdkPath = properties.getProperty("flutter.sdk")
+                assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+                return flutterSdkPath
+            }
+            settings.ext.flutterSdkPath = flutterSdkPath()
+            includeBuild("\${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        plugins {
+            id "dev.flutter.flutter-gradle-plugin" version "1.0.0" apply false
+            id "com.android.application" version "7.3.0" apply false
+            id "org.jetbrains.kotlin.android" version "1.7.10" apply false
+            id "com.google.gms.google-services" version "4.4.1" apply false
+        }
+        include ":app"
+        EOF
+
+        # 5. 🔥 تفعيل البلوجن في تطبيق الأندرويد
+        # نضيف سطر التفعيل في ملف التطبيق
+        sed -i 's/id "dev.flutter.flutter-gradle-plugin"/id "dev.flutter.flutter-gradle-plugin"\n    id "com.google.gms.google-services"/g' android/app/build.gradle
         
         # 6. ✅ إضافة إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
@@ -65,6 +83,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-force-fix
+        name: afya-final-attempt
         path: build/app/outputs/flutter-apk/app-release.apk
- 
