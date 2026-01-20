@@ -1,4 +1,4 @@
-name: Ultimate Fix
+name: Fixed Plugin Location
 
 on:
   push:
@@ -20,29 +20,30 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Repair Android & Fix Plugins
+    - name: Repair Android & Inject Plugins Correctly
       run: |
         # 1. حفظ المفتاح
         mv android/app/google-services.json .
         
-        # 2. حذف المجلد القديم وإعادة الإنشاء
+        # 2. تجديد مجلد أندرويد
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
         # 3. استعادة المفتاح
         mv google-services.json android/app/
         
-        # 4. 🔥 الحل السحري: إضافة تعريف فايربيز في المكان الصحيح (settings.gradle)
-        # هذا الأمر يضيف مكتبة خدمات جوجل إلى قائمة الإضافات
+        # 4. ✅ تعريف الفايربيز في الملف الرئيسي (settings.gradle)
+        # نضعه داخل قوس plugins { الموجود أصلاً
         sed -i 's/plugins {/plugins {\n    id "com.google.gms.google-services" version "4.4.0" apply false/g' android/settings.gradle
         
-        # 5. تفعيل الإضافة في ملف التطبيق
-        echo "plugins { id 'com.google.gms.google-services' }" >> android/app/build.gradle
+        # 5. ✅ تفعيل الفايربيز في ملف التطبيق (app/build.gradle)
+        # 🔥 التصحيح: نضعه في القمة داخل قوس plugins { بدلاً من الأسفل
+        sed -i 's/plugins {/plugins {\n    id "com.google.gms.google-services"/g' android/app/build.gradle
         
         # 6. إضافة إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # 7. رفع الحد الأدنى للإصدار (MinSDK) ليقبل فايربيز
+        # 7. تحديث إصدار SDK
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
     - name: Get dependencies
@@ -54,6 +55,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-ultimate-fix
+        name: afya-success
         path: build/app/outputs/flutter-apk/app-release.apk
- 
