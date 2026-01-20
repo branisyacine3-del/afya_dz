@@ -1,4 +1,4 @@
-name: Classic Fix (Guaranteed)
+name: Fixed Location Build
 
 on:
   push:
@@ -20,31 +20,33 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Nuclear Repair & Link
+    - name: Repair & Link (Custom Path)
       run: |
-        # 1. نحفظ المفتاح
-        mv android/app/google-services.json .
+        # 1. 🔥 تعديل مهم: سحب المفتاح من مكانه الحالي (src/main)
+        # إذا لم يجده هناك، يبحث في المجلد الرئيسي احتياطاً
+        if [ -f android/app/src/main/google-services.json ]; then
+          mv android/app/src/main/google-services.json .
+        else
+          mv android/app/google-services.json .
+        fi
         
-        # 2. نحذف ونعيد إنشاء الأندرويد
+        # 2. حذف وإعادة إنشاء الأندرويد
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 3. نعيد المفتاح
+        # 3. وضع المفتاح في المكان الصحيح القياسي
         mv google-services.json android/app/
         
-        # 4. 🔥 الحقن الكلاسيكي (الأكثر ضماناً)
-        # نضيف الـ Classpath في ملف المشروع الرئيسي
-        # نبحث عن كلمة dependencies ونضيف تحتها السطر مباشرة
+        # 4. الحقن الكلاسيكي المضمون لفايربيز
         sed -i 's/dependencies {/dependencies {\n        classpath "com.google.gms:google-services:4.4.1"/g' android/build.gradle
         
-        # 5. 🔥 تفعيل البلوجن في ملف التطبيق
-        # نضيف سطر التفعيل في آخر الملف (هذا دائماً يعمل)
+        # 5. تفعيل البلوجن
         echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
         
-        # 6. ✅ إضافة إذن الإنترنت
+        # 6. إضافة إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # 7. ✅ ضبط الحد الأدنى للإصدار
+        # 7. تحديث الإصدار
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
     - name: Get dependencies
@@ -56,5 +58,6 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-classic-works
+        name: afya-works-finally
         path: build/app/outputs/flutter-apk/app-release.apk
+ 
