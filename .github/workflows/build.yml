@@ -1,4 +1,4 @@
-name: Nuclear Firebase Fix
+name: Dart-Only Config Build
 
 on:
   push:
@@ -20,74 +20,20 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Manual File Overwrite
+    - name: Clean Build Setup
       run: |
-        # 1. إنقاذ المفتاح
-        if [ -f android/app/src/main/google-services.json ]; then
-          mv android/app/src/main/google-services.json .
-        elif [ -f android/app/google-services.json ]; then
-          mv android/app/google-services.json .
-        fi
-        
-        # 2. إنشاء الهيكل الأساسي
+        # 1. تنظيف كامل وإنشاء مشروع جديد خالٍ من إضافات فايربيز المعقدة
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 3. استرجاع المفتاح
-        mv google-services.json android/app/
-
-        # 4. 🔥 تفجير ملف build.gradle الرئيسي وكتابته من الصفر (الطريقة القديمة المضمونة)
-        rm android/build.gradle
-        cat > android/build.gradle <<EOF
-        buildscript {
-            ext.kotlin_version = '1.7.10'
-            repositories {
-                google()
-                mavenCentral()
-            }
-            dependencies {
-                classpath 'com.android.tools.build:gradle:7.3.0'
-                classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:\$kotlin_version"
-                classpath 'com.google.gms:google-services:4.3.15' // نسخة قديمة ومستقرة جداً
-            }
-        }
-        allprojects {
-            repositories {
-                google()
-                mavenCentral()
-            }
-        }
-        rootProject.buildDir = '../build'
-        subprojects {
-            project.buildDir = "\${rootProject.buildDir}/\${project.name}"
-            project.evaluationDependsOn(':app')
-        }
-        task clean(type: Delete) {
-            delete rootProject.buildDir
-        }
-        EOF
-
-        # 5. 🔥 تفجير ملف settings.gradle وتبسيطه (إلغاء تعقيدات فلاتر الجديدة)
-        rm android/settings.gradle
-        cat > android/settings.gradle <<EOF
-        include ':app'
-        
-        def localPropertiesFile = new File(rootProject.projectDir, "local.properties")
-        def properties = new Properties()
-        assert localPropertiesFile.exists()
-        localPropertiesFile.withInputStream { properties.load(it) }
-        def flutterSdkPath = properties.getProperty("flutter.sdk")
-        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-        apply from: "\$flutterSdkPath/packages/flutter_tools/gradle/app_plugin_loader.gradle"
-        EOF
-
-        # 6. 🔥 تعديل ملف التطبيق لإضافة التفعيل (Apply Plugin)
-        # نستخدم الإضافة في آخر الملف لأننا نستخدم النظام القديم الآن
-        echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
-
-        # 7. إصلاحات إضافية (الإنترنت + الإصدار)
+        # 2. إضافة إذن الإنترنت فقط (ضروري للاتصال)
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+        
+        # 3. رفع الحد الأدنى للإصدار ليعمل مع المكتبات الحديثة
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
+        
+        # ملاحظة: لن نقوم بحقن "google-services plugin" هنا أبداً
+        # لأننا نستخدم التهيئة اليدوية في main.dart
 
     - name: Get dependencies
       run: flutter pub get
@@ -98,5 +44,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-nuclear-fix
+        name: afya-web-config
         path: build/app/outputs/flutter-apk/app-release.apk
