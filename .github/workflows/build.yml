@@ -1,4 +1,4 @@
-name: Laser Fix Build
+name: Force Legacy Fix
 
 on:
   push:
@@ -20,36 +20,40 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Surgical Repair & Link
+    - name: Reset & Force Injection
       run: |
-        # 1. 🕵️‍♂️ إنقاذ المفتاح (من أي مكان محتمل)
+        # 1. 🕵️‍♂️ إنقاذ المفتاح
         if [ -f android/app/src/main/google-services.json ]; then
-          echo "Found key in src/main"
+          echo "Key found in src/main"
           mv android/app/src/main/google-services.json .
         elif [ -f android/app/google-services.json ]; then
-          echo "Found key in app root"
+          echo "Key found in app root"
           mv android/app/google-services.json .
+        else
+          echo "⚠️ Warning: No key found!"
         fi
         
-        # 2. 🧹 تجديد كامل للمشروع (لضمان وجود أدوات الأندرويد)
+        # 2. 🧹 هدم وبناء
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 3. 🔙 إعادة المفتاح لمكانه
+        # 3. 🔙 استرجاع المفتاح
         mv google-services.json android/app/
         
-        # 4. 🔥 الحقن بالليزر في (settings.gradle)
-        # الأمر: ابحث عن بلوجن فلاتر، وضع تحته بلوجن جوجل (مع الإصدار)
-        sed -i '/id "dev.flutter.flutter-gradle-plugin"/a \    id "com.google.gms.google-services" version "4.4.1" apply false' android/settings.gradle
+        # 4. 🔥 الزرع الإجباري (Force Injection)
+        # نقوم بإنشاء ملف مؤقت يحتوي على تعريف فايربيز، ثم ندمجه مع الملف الأصلي
+        # هذا يضمن أن يكون التعريف في السطر الأول ولا يتأثر بالتحديثات
+        echo 'buildscript { repositories { google(); mavenCentral() } dependencies { classpath "com.google.gms:google-services:4.4.1" } }' > android/temp_build.gradle
+        cat android/build.gradle >> android/temp_build.gradle
+        mv android/temp_build.gradle android/build.gradle
         
-        # 5. 🔥 الحقن بالليزر في (app/build.gradle)
-        # الأمر: ابحث عن بلوجن فلاتر، وضع تحته تفعيل جوجل (بدون إصدار)
-        sed -i '/id "dev.flutter.flutter-gradle-plugin"/a \    id "com.google.gms.google-services"' android/app/build.gradle
+        # 5. 🔥 تفعيل البلوجن في التطبيق (أسهل طريقة)
+        echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
         
         # 6. ✅ إضافة إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # 7. ⚙️ رفع الحد الأدنى للإصدار
+        # 7. ⚙️ رفع الإصدار
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
     - name: Get dependencies
@@ -61,5 +65,6 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-laser-fix
+        name: afya-force-fix
         path: build/app/outputs/flutter-apk/app-release.apk
+ 
