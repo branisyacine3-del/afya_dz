@@ -1,4 +1,4 @@
-name: Fixed Plugin Location
+name: Classic Fix (Guaranteed)
 
 on:
   push:
@@ -20,30 +20,31 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Repair Android & Inject Plugins Correctly
+    - name: Nuclear Repair & Link
       run: |
-        # 1. حفظ المفتاح
+        # 1. نحفظ المفتاح
         mv android/app/google-services.json .
         
-        # 2. تجديد مجلد أندرويد
+        # 2. نحذف ونعيد إنشاء الأندرويد
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 3. استعادة المفتاح
+        # 3. نعيد المفتاح
         mv google-services.json android/app/
         
-        # 4. ✅ تعريف الفايربيز في الملف الرئيسي (settings.gradle)
-        # نضعه داخل قوس plugins { الموجود أصلاً
-        sed -i 's/plugins {/plugins {\n    id "com.google.gms.google-services" version "4.4.0" apply false/g' android/settings.gradle
+        # 4. 🔥 الحقن الكلاسيكي (الأكثر ضماناً)
+        # نضيف الـ Classpath في ملف المشروع الرئيسي
+        # نبحث عن كلمة dependencies ونضيف تحتها السطر مباشرة
+        sed -i 's/dependencies {/dependencies {\n        classpath "com.google.gms:google-services:4.4.1"/g' android/build.gradle
         
-        # 5. ✅ تفعيل الفايربيز في ملف التطبيق (app/build.gradle)
-        # 🔥 التصحيح: نضعه في القمة داخل قوس plugins { بدلاً من الأسفل
-        sed -i 's/plugins {/plugins {\n    id "com.google.gms.google-services"/g' android/app/build.gradle
+        # 5. 🔥 تفعيل البلوجن في ملف التطبيق
+        # نضيف سطر التفعيل في آخر الملف (هذا دائماً يعمل)
+        echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
         
-        # 6. إضافة إذن الإنترنت
+        # 6. ✅ إضافة إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # 7. تحديث إصدار SDK
+        # 7. ✅ ضبط الحد الأدنى للإصدار
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
     - name: Get dependencies
@@ -55,5 +56,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-success
+        name: afya-classic-works
         path: build/app/outputs/flutter-apk/app-release.apk
