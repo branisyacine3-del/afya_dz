@@ -1,4 +1,4 @@
-name: Build Android App
+name: Build Afya App
 
 on:
   push:
@@ -9,34 +9,52 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. جلب الكود من GitHub
+    # 1. جلب الكود
     - uses: actions/checkout@v4
 
-    # 2. إعداد بيئة جافا
+    # 2. تجهيز الجافا
     - uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
         java-version: '17'
 
-    # 3. إعداد بيئة Flutter (أحدث نسخة مستقرة)
+    # 3. تجهيز فلاتر
     - uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.19.0'
-        channel: 'stable'
 
-    # 4. تحميل المكتبات (بدون أيقونات)
+    # 4. 🔥 الخطوة السحرية: تجديد ملفات الأندرويد (Fix V2 Embedding)
+    - name: Recreate Android Project
+      run: |
+        # نحتفظ بملف مفتاح فايربيز جانباً
+        mv android/app/google-services.json .
+        
+        # نحذف مجلد أندرويد القديم والمشاكل معه
+        rm -rf android
+        
+        # نأمر فلاتر بإنشاء مجلد أندرويد جديد وحديث 100%
+        flutter create . --org com.yacine.afya_dz --project-name afya_dz --platform android
+        
+        # نعيد ملف المفتاح لمكانه
+        mv google-services.json android/app/
+
+    # 5. إضافة إذن الإنترنت تلقائياً (بدون تدخل يدوي)
+    - name: Inject Internet Permission
+      run: |
+        sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+
+    # 6. تحميل المكتبات
     - name: Get dependencies
       run: flutter pub get
 
-    # 5. بناء التطبيق (APK)
-    # ملاحظة: ألغينا خطوة الأيقونات وخطوة ملف google-services لأنك رفعته يدوياً
+    # 7. بناء التطبيق
     - name: Build APK
       run: flutter build apk --release --no-tree-shake-icons
 
-    # 6. رفع التطبيق لكي تحمله أنت
+    # 8. الرفع
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: release-apk
+        name: afya-app-v2
         path: build/app/outputs/flutter-apk/app-release.apk
  
