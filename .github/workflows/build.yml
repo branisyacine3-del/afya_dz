@@ -1,4 +1,4 @@
-name: Full Rewrite Build
+name: Laser Fix Build
 
 on:
   push:
@@ -20,56 +20,36 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Recreate & Overwrite Configs
+    - name: Surgical Repair & Link
       run: |
-        # 1. البحث عن المفتاح وحفظه
+        # 1. 🕵️‍♂️ إنقاذ المفتاح (من أي مكان محتمل)
         if [ -f android/app/src/main/google-services.json ]; then
+          echo "Found key in src/main"
           mv android/app/src/main/google-services.json .
         elif [ -f android/app/google-services.json ]; then
+          echo "Found key in app root"
           mv android/app/google-services.json .
         fi
         
-        # 2. إنشاء المشروع من جديد
+        # 2. 🧹 تجديد كامل للمشروع (لضمان وجود أدوات الأندرويد)
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 3. إعادة المفتاح للمكان الصحيح
+        # 3. 🔙 إعادة المفتاح لمكانه
         mv google-services.json android/app/
         
-        # 4. 🔥 كتابة ملف settings.gradle يدوياً (الحل الأكيد)
-        # هذا يضمن وجود بلوجن جوجل بدون أخطاء
-        cat > android/settings.gradle <<EOF
-        pluginManagement {
-            def flutterSdkPath = {
-                def properties = new Properties()
-                file("local.properties").withInputStream { properties.load(it) }
-                def flutterSdkPath = properties.getProperty("flutter.sdk")
-                assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                return flutterSdkPath
-            }
-            settings.ext.flutterSdkPath = flutterSdkPath()
-            includeBuild("\${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
-            repositories {
-                google()
-                mavenCentral()
-                gradlePluginPortal()
-            }
-            plugins {
-                id "dev.flutter.flutter-gradle-plugin" version "1.0.0" apply false
-                id "com.google.gms.google-services" version "4.4.1" apply false
-            }
-        }
-        include ":app"
-        EOF
+        # 4. 🔥 الحقن بالليزر في (settings.gradle)
+        # الأمر: ابحث عن بلوجن فلاتر، وضع تحته بلوجن جوجل (مع الإصدار)
+        sed -i '/id "dev.flutter.flutter-gradle-plugin"/a \    id "com.google.gms.google-services" version "4.4.1" apply false' android/settings.gradle
         
-        # 5. 🔥 إضافة التفعيل في ملف التطبيق
-        # نضيف السطر في نهاية الملف (أسهل وأضمن طريقة)
-        echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+        # 5. 🔥 الحقن بالليزر في (app/build.gradle)
+        # الأمر: ابحث عن بلوجن فلاتر، وضع تحته تفعيل جوجل (بدون إصدار)
+        sed -i '/id "dev.flutter.flutter-gradle-plugin"/a \    id "com.google.gms.google-services"' android/app/build.gradle
         
-        # 6. إضافة إذن الإنترنت
+        # 6. ✅ إضافة إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # 7. رفع الإصدار
+        # 7. ⚙️ رفع الحد الأدنى للإصدار
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
     - name: Get dependencies
@@ -81,5 +61,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-diagnostic-v1
+        name: afya-laser-fix
         path: build/app/outputs/flutter-apk/app-release.apk
