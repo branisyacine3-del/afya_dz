@@ -2,27 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'auth.dart';
+import 'patient.dart';
+import 'provider.dart';
+import 'admin.dart';
 
-// استيراد الملفات التي سنصنعها في الخطوات القادمة
-// (لا تقلق من الخطوط الحمراء هنا مؤقتاً)
-import 'auth.dart';      // ملف الدخول
-import 'patient.dart';   // ملف المريض
-import 'provider.dart';  // ملف الممرض (فيه شاشة الدفع)
-import 'admin.dart';     // ملف الأدمن
-
-void main() async {
+void main() {
+  // 🚀 نلغي الانتظار هنا لتفادي الشاشة الرمادية
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp();
-    print("✅ تم الاتصال بفايربيز بنجاح");
-  } catch (e) {
-    print("❌ خطأ في فايربيز: $e");
-  }
   runApp(const AfyaApp());
 }
 
-class AfyaApp extends StatelessWidget {
+class AfyaApp extends StatefulWidget {
   const AfyaApp({super.key});
+
+  @override
+  State<AfyaApp> createState() => _AfyaAppState();
+}
+
+class _AfyaAppState extends State<AfyaApp> {
+  // متغير لتخزين حالة الاتصال والخطأ
+  final Future<FirebaseApp> _initialization = Firebase.initializeApp();
 
   @override
   Widget build(BuildContext context) {
@@ -32,15 +32,48 @@ class AfyaApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.teal,
         useMaterial3: false,
-        scaffoldBackgroundColor: const Color(0xFFF5F5F5), // خلفية رمادية فاتحة مريحة
+        scaffoldBackgroundColor: const Color(0xFFF5F5F5),
       ),
-      // نقطة البداية: الموجه الذكي
-      home: const AuthGate(),
+      home: FutureBuilder(
+        future: _initialization,
+        builder: (context, snapshot) {
+          // 🛑 حالة الخطأ: اعرض المشكلة بدلاً من الشاشة الرمادية
+          if (snapshot.hasError) {
+            return Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 80, color: Colors.red),
+                      const SizedBox(height: 20),
+                      const Text("حدث خطأ في تشغيل التطبيق", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      Text("الخطأ: ${snapshot.error}", textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 20),
+                      const Text("تأكد من ملف google-services.json واسم الحزمة (Package Name).", textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
+          // ⏳ حالة التحميل
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+
+          // ✅ تم الاتصال بنجاح: اعرض التطبيق
+          return const AuthGate();
+        },
+      ),
     );
   }
 }
 
-// 👮‍♂️ الموجه الذكي: يفحص هل أنت مسجل أم لا
+// 👮‍♂️ الموجه الذكي (كما هو)
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -49,24 +82,18 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // 1. إذا كان التطبيق يحمل البيانات
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
-
-        // 2. إذا كان المستخدم مسجلاً للدخول -> نفحص دوره واشتراكه
         if (snapshot.hasData && snapshot.data != null) {
           return RoleCheckWrapper(uid: snapshot.data!.uid);
         }
-
-        // 3. غير مسجل -> يذهب لصفحة الدخول
         return const AuthScreen(); 
       },
     );
   }
 }
 
-// 🕵️‍♂️ فحص الدور والاشتراك (نظام الـ 30 يوم)
 class RoleCheckWrapper extends StatelessWidget {
   final String uid;
   const RoleCheckWrapper({super.key, required this.uid});
@@ -79,56 +106,27 @@ class RoleCheckWrapper extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
-
         if (!snapshot.hasData || !snapshot.data!.exists) {
-          // حساب غير موجود في قاعدة البيانات (حالة نادرة)
           return const AuthScreen(); 
         }
-
-        // جلب البيانات
         var data = snapshot.data!.data() as Map<String, dynamic>;
-        String role = data['role'] ?? 'patient'; // الافتراضي مريض
+        String role = data['role'] ?? 'patient'; 
         
-        // 👑 إذا كان المدير
         if (role == 'admin') return const AdminDashboard();
-
-        // 🚑 إذا كان مريضاً (يدخل مباشرة)
         if (role == 'patient') return const PatientHome();
-
-        // 👨‍⚕️ إذا كان ممرضاً (هنا نطبق نظام الـ 30 يوم)
         if (role == 'provider') {
-          // فحص حالة الحساب
-          String status = data['status'] ?? 'pending'; // pending, active, expired
-          
-          // فحص تاريخ انتهاء الاشتراك
+          String status = data['status'] ?? 'pending'; 
           Timestamp? expiryTimestamp = data['subscription_expiry'];
           bool isExpired = false;
-          
           if (expiryTimestamp != null) {
-            DateTime expiryDate = expiryTimestamp.toDate();
-            if (DateTime.now().isAfter(expiryDate)) {
-              isExpired = true;
-            }
+            if (DateTime.now().isAfter(expiryTimestamp.toDate())) isExpired = true;
           }
-
-          // 🛑 1. الحساب جديد ولم يتم تفعيله من طرفك
-          if (status == 'pending') {
-            return const ProviderPaymentScreen(status: 'pending');
-          }
-
-          // 🛑 2. الاشتراك انتهى (فاتت 30 يوم)
-          if (isExpired || status == 'expired') {
-            return const ProviderPaymentScreen(status: 'expired');
-          }
-
-          // ✅ 3. الحساب مفعل والاشتراك ساري
+          if (status == 'pending') return const ProviderPaymentScreen(status: 'pending');
+          if (isExpired || status == 'expired') return const ProviderPaymentScreen(status: 'expired');
           return const ProviderDashboard();
         }
-
-        // أي حالة أخرى
         return const AuthScreen();
       },
     );
   }
 }
- 
