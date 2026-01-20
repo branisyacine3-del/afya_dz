@@ -1,4 +1,4 @@
-name: Simple Build (No Firebase)
+name: Full App Build
 
 on:
   push:
@@ -20,13 +20,35 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    # نكتفي بتنظيف المجلد القديم وإنشاؤه من جديد بشكل قياسي
-    - name: Clean Build Environment
+    - name: Prepare & Configure
       run: |
+        # 1. 🕵️‍♂️ إنقاذ ملف المفاتيح
+        if [ -f android/app/src/main/google-services.json ]; then
+          mv android/app/src/main/google-services.json .
+        elif [ -f android/app/google-services.json ]; then
+          mv android/app/google-services.json .
+        fi
+        
+        # 2. 🧹 إنشاء مشروع جديد ونظيف (يضمن وجود الملفات الصحيحة)
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
-        # إضافة الإنترنت فقط (أمر بسيط جداً وآمن)
+        
+        # 3. 🔙 إعادة المفتاح
+        mv google-services.json android/app/
+        
+        # 4. 🔥 الحقن الذكي في (settings.gradle)
+        # نبحث عن السطر الخاص بفلاتر، ونضيف سطر فايربيز تحته مباشرة
+        sed -i '/id "dev.flutter.flutter-gradle-plugin"/a \    id "com.google.gms.google-services" version "4.4.1" apply false' android/settings.gradle
+        
+        # 5. 🔥 الحقن الذكي في (app/build.gradle)
+        # نفس الشيء، نضيف التفعيل تحت سطر فلاتر
+        sed -i '/id "dev.flutter.flutter-gradle-plugin"/a \    id "com.google.gms.google-services"' android/app/build.gradle
+        
+        # 6. ✅ إضافة إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+        
+        # 7. ⚙️ رفع الإصدار
+        sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
     - name: Get dependencies
       run: flutter pub get
@@ -37,5 +59,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-working-app
+        name: afya-full-app
         path: build/app/outputs/flutter-apk/app-release.apk
