@@ -2,9 +2,20 @@
     package="com.yacine.afya_dz">
 
     <uses-permission android:name="android.permission.INTERNET"/>
+    
+    <uses-queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+    </uses-queries>
 
     <application
-        android:label="afya_dz"
+        android:label="Afya DZ"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
