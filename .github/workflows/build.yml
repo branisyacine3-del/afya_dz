@@ -1,4 +1,4 @@
-name: Full Repair Build
+name: Final Fix & Link
 
 on:
   push:
@@ -23,24 +23,33 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    # 4. 🔥 العملية الجراحية: تجديد ملفات الأندرويد وإصلاح خطأ V2
-    - name: Recreate Android Project & Fix Permissions
+    # 4. 🔥 العملية الكاملة: تجديد الأندرويد + ربط فايربيز + إصلاح الإنترنت
+    - name: Repair Android & Link Firebase
       run: |
-        # 1. نحتفظ بالمفتاح
+        # 1. حفظ المفتاح جانباً
         mv android/app/google-services.json .
         
-        # 2. نحذف المجلد القديم
+        # 2. حذف المجلد القديم المعطوب
         rm -rf android
         
-        # 3. ننشئ مجلداً جديداً حديثاً
+        # 3. إنشاء مجلد جديد متوافق مع V2
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 4. نعيد المفتاح
+        # 4. استعادة المفتاح
         mv google-services.json android/app/
         
-        # 5. 🔥 أهم خطوة: إضافة إذن الإنترنت للملف الجديد
-        # هذا الأمر يبحث عن وسم التطبيق ويضيف قبله إذن الإنترنت
+        # 5. ✅ إضافة إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+        
+        # 6. ✅ ربط فايربيز (إضافة Classpath في الملف الرئيسي)
+        sed -i 's/dependencies {/dependencies {\n        classpath "com.google.gms:google-services:4.4.0"/g' android/build.gradle
+        
+        # 7. ✅ تفعيل فايربيز (تطبيق الـ Plugin في ملف التطبيق)
+        echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+        
+        # 8. ✅ رفع مستوى الـ SDK ليتوافق مع فايربيز الحديث (MinSDK 23)
+        sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
+        sed -i 's/minSdkVersion [0-9]*/minSdkVersion 23/g' android/app/build.gradle
 
     # 5. تحميل المكتبات
     - name: Get dependencies
@@ -54,6 +63,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-final-fix
+        name: afya-final-linked
         path: build/app/outputs/flutter-apk/app-release.apk
- 
