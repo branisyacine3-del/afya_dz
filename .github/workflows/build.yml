@@ -1,4 +1,4 @@
-name: Final Fix & Link
+name: Ultimate Fix
 
 on:
   push:
@@ -9,59 +9,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. جلب الملفات
     - uses: actions/checkout@v4
 
-    # 2. إعداد الجافا
     - uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
         java-version: '17'
 
-    # 3. إعداد فلاتر
     - uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.19.0'
 
-    # 4. 🔥 العملية الكاملة: تجديد الأندرويد + ربط فايربيز + إصلاح الإنترنت
-    - name: Repair Android & Link Firebase
+    - name: Repair Android & Fix Plugins
       run: |
-        # 1. حفظ المفتاح جانباً
+        # 1. حفظ المفتاح
         mv android/app/google-services.json .
         
-        # 2. حذف المجلد القديم المعطوب
+        # 2. حذف المجلد القديم وإعادة الإنشاء
         rm -rf android
-        
-        # 3. إنشاء مجلد جديد متوافق مع V2
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 4. استعادة المفتاح
+        # 3. استعادة المفتاح
         mv google-services.json android/app/
         
-        # 5. ✅ إضافة إذن الإنترنت
+        # 4. 🔥 الحل السحري: إضافة تعريف فايربيز في المكان الصحيح (settings.gradle)
+        # هذا الأمر يضيف مكتبة خدمات جوجل إلى قائمة الإضافات
+        sed -i 's/plugins {/plugins {\n    id "com.google.gms.google-services" version "4.4.0" apply false/g' android/settings.gradle
+        
+        # 5. تفعيل الإضافة في ملف التطبيق
+        echo "plugins { id 'com.google.gms.google-services' }" >> android/app/build.gradle
+        
+        # 6. إضافة إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # 6. ✅ ربط فايربيز (إضافة Classpath في الملف الرئيسي)
-        sed -i 's/dependencies {/dependencies {\n        classpath "com.google.gms:google-services:4.4.0"/g' android/build.gradle
-        
-        # 7. ✅ تفعيل فايربيز (تطبيق الـ Plugin في ملف التطبيق)
-        echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
-        
-        # 8. ✅ رفع مستوى الـ SDK ليتوافق مع فايربيز الحديث (MinSDK 23)
+        # 7. رفع الحد الأدنى للإصدار (MinSDK) ليقبل فايربيز
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
-        sed -i 's/minSdkVersion [0-9]*/minSdkVersion 23/g' android/app/build.gradle
 
-    # 5. تحميل المكتبات
     - name: Get dependencies
       run: flutter pub get
 
-    # 6. بناء التطبيق
     - name: Build APK
       run: flutter build apk --release --no-tree-shake-icons
 
-    # 7. الرفع
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-final-linked
+        name: afya-ultimate-fix
         path: build/app/outputs/flutter-apk/app-release.apk
+ 
