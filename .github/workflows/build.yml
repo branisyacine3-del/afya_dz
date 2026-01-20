@@ -1,4 +1,4 @@
-name: Full Replacement Fix
+name: Simple Build (No Firebase)
 
 on:
   push:
@@ -20,59 +20,13 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Reset & Overwrite Configs
+    # نكتفي بتنظيف المجلد القديم وإنشاؤه من جديد بشكل قياسي
+    - name: Clean Build Environment
       run: |
-        # 1. 🕵️‍♂️ إنقاذ المفتاح
-        if [ -f android/app/src/main/google-services.json ]; then
-          mv android/app/src/main/google-services.json .
-        elif [ -f android/app/google-services.json ]; then
-          mv android/app/google-services.json .
-        fi
-        
-        # 2. 🧹 إنشاء مشروع نظيف
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
-        
-        # 3. 🔙 إعادة المفتاح
-        mv google-services.json android/app/
-        
-        # 4. 🔥 استبدال ملف settings.gradle بالكامل (فيه تعريف فايربيز)
-        rm android/settings.gradle
-        cat > android/settings.gradle <<EOF
-        pluginManagement {
-            def flutterSdkPath = {
-                def properties = new Properties()
-                file("local.properties").withInputStream { properties.load(it) }
-                def flutterSdkPath = properties.getProperty("flutter.sdk")
-                assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                return flutterSdkPath
-            }
-            settings.ext.flutterSdkPath = flutterSdkPath()
-            includeBuild("\${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
-            repositories {
-                google()
-                mavenCentral()
-                gradlePluginPortal()
-            }
-        }
-        plugins {
-            id "dev.flutter.flutter-gradle-plugin" version "1.0.0" apply false
-            id "com.android.application" version "7.3.0" apply false
-            id "org.jetbrains.kotlin.android" version "1.7.10" apply false
-            id "com.google.gms.google-services" version "4.4.1" apply false
-        }
-        include ":app"
-        EOF
-
-        # 5. 🔥 تفعيل البلوجن في تطبيق الأندرويد
-        # نضيف سطر التفعيل في ملف التطبيق
-        sed -i 's/id "dev.flutter.flutter-gradle-plugin"/id "dev.flutter.flutter-gradle-plugin"\n    id "com.google.gms.google-services"/g' android/app/build.gradle
-        
-        # 6. ✅ إضافة إذن الإنترنت
+        # إضافة الإنترنت فقط (أمر بسيط جداً وآمن)
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
-        
-        # 7. ⚙️ رفع الإصدار
-        sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
     - name: Get dependencies
       run: flutter pub get
@@ -83,5 +37,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-final-attempt
+        name: afya-working-app
         path: build/app/outputs/flutter-apk/app-release.apk
