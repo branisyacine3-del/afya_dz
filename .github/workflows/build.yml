@@ -1,4 +1,4 @@
-name: Fixed Location Build
+name: Modern Firebase Fix
 
 on:
   push:
@@ -20,33 +20,38 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Repair & Link (Custom Path)
+    - name: Repair & Link (Modern Way)
       run: |
-        # 1. 🔥 تعديل مهم: سحب المفتاح من مكانه الحالي (src/main)
-        # إذا لم يجده هناك، يبحث في المجلد الرئيسي احتياطاً
+        # 1. 🕵️‍♂️ البحث عن المفتاح وسحبه من أي مكان محتمل
         if [ -f android/app/src/main/google-services.json ]; then
+          echo "Found key in src/main, moving it..."
           mv android/app/src/main/google-services.json .
-        else
+        elif [ -f android/app/google-services.json ]; then
+          echo "Found key in app root, moving it..."
           mv android/app/google-services.json .
+        else
+          echo "⚠️ Warning: Key not found in expected places!"
         fi
         
-        # 2. حذف وإعادة إنشاء الأندرويد
+        # 2. 🧹 تنظيف وإعادة بناء الأندرويد
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 3. وضع المفتاح في المكان الصحيح القياسي
+        # 3. 🔙 إعادة المفتاح للمكان القياسي
         mv google-services.json android/app/
         
-        # 4. الحقن الكلاسيكي المضمون لفايربيز
-        sed -i 's/dependencies {/dependencies {\n        classpath "com.google.gms:google-services:4.4.1"/g' android/build.gradle
+        # 4. 🔥 الحقن الحديث (settings.gradle) - هذا هو حل المشكلة
+        # نبحث عن بلوجن فلاتر ونضع بلوجن جوجل قبله
+        sed -i 's/id "dev.flutter.flutter-gradle-plugin"/id "com.google.gms.google-services" version "4.4.1" apply false\n    id "dev.flutter.flutter-gradle-plugin"/g' android/settings.gradle
         
-        # 5. تفعيل البلوجن
-        echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+        # 5. 🔥 تفعيل البلوجن في التطبيق (app/build.gradle)
+        # أيضاً نضعه بجانب بلوجن فلاتر لضمان الترتيب الصحيح
+        sed -i 's/id "dev.flutter.flutter-gradle-plugin"/id "com.google.gms.google-services"\n    id "dev.flutter.flutter-gradle-plugin"/g' android/app/build.gradle
         
-        # 6. إضافة إذن الإنترنت
+        # 6. ✅ إضافة إذن الإنترنت
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # 7. تحديث الإصدار
+        # 7. ⚙️ ضبط الحد الأدنى للإصدار
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
     - name: Get dependencies
@@ -58,6 +63,6 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-works-finally
+        name: afya-modern-fix
         path: build/app/outputs/flutter-apk/app-release.apk
  
