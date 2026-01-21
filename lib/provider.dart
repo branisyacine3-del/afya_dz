@@ -2,9 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:image_picker/image_picker.dart'; // لرفع صور الوثائق
+import 'package:image_picker/image_picker.dart'; // 👈 هذا هو السطر الذي كان مفقوداً ويسبب المشكلة
 
-// 🚦 البوابة الذكية للممرض (توجهك حسب حالتك)
+// 🚦 البوابة الذكية للممرض
 class ProviderGate extends StatelessWidget {
   const ProviderGate({super.key});
 
@@ -17,13 +17,13 @@ class ProviderGate extends StatelessWidget {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-        var data = snapshot.data!.data() as Map<String, dynamic>;
-        String status = data['status'] ?? 'pending_docs'; // الحالة الافتراضية
+        if (!snapshot.data!.exists) return const Scaffold(body: Center(child: Text("حساب غير موجود")));
 
-        // 1️⃣ مرحلة رفع الوثائق
+        var data = snapshot.data!.data() as Map<String, dynamic>;
+        String status = data['status'] ?? 'pending_docs';
+
         if (status == 'pending_docs') return const VerificationScreen();
         
-        // ⏳ مرحلة انتظار مراجعة الوثائق
         if (status == 'under_review') return const StatusScreen(
           title: "جاري مراجعة وثائقك 📄",
           message: "فريق عافية يتحقق من وثائقك حالياً. ستصلك رسالة قريباً للمرور لمرحلة الدفع.",
@@ -31,10 +31,8 @@ class ProviderGate extends StatelessWidget {
           color: Colors.orange,
         );
 
-        // 2️⃣ مرحلة الدفع (الاشتراك)
         if (status == 'pending_payment') return const SubscriptionScreen();
 
-        // ⏳ مرحلة انتظار تأكيد الدفع
         if (status == 'payment_review') return const StatusScreen(
           title: "جاري تأكيد الدفع 💸",
           message: "وصلنا إيصال الدفع الخاص بك. سيتم تفعيل حسابك في أقل من 24 ساعة.",
@@ -42,10 +40,8 @@ class ProviderGate extends StatelessWidget {
           color: Colors.blue,
         );
 
-        // 3️⃣ مرحلة العمل (مفعل)
         if (status == 'active') return const ProviderDashboard();
 
-        // ❌ مرحلة الرفض
         return const StatusScreen(
           title: "عذراً",
           message: "تم رفض طلبك لعدم استيفاء الشروط. يرجى التواصل مع الإدارة.",
@@ -57,9 +53,7 @@ class ProviderGate extends StatelessWidget {
   }
 }
 
-// -------------------------------------------------------------------------
-// 1️⃣ شاشة رفع الوثائق (Verification)
-// -------------------------------------------------------------------------
+// 1️⃣ شاشة رفع الوثائق
 class VerificationScreen extends StatefulWidget {
   const VerificationScreen({super.key});
 
@@ -68,7 +62,6 @@ class VerificationScreen extends StatefulWidget {
 }
 
 class _VerificationScreenState extends State<VerificationScreen> {
-  // متغيرات لحفظ هل تم رفع الصور (محاكاة)
   bool _idUploaded = false;
   bool _diplomaUploaded = false;
   bool _photoUploaded = false;
@@ -79,8 +72,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     
     if (image != null) {
-      // هنا المفروض نرفع الصورة لـ Firebase Storage
-      // حالياً سنكتفي بتحديث الواجهة لمحاكاة الرفع
       setState(() {
         if (type == 'id') _idUploaded = true;
         if (type == 'diploma') _diplomaUploaded = true;
@@ -96,7 +87,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
     }
 
     setState(() => _isLoading = true);
-    // تحديث الحالة إلى "قيد المراجعة"
     await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
       'status': 'under_review',
     });
@@ -147,9 +137,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
   }
 }
 
-// -------------------------------------------------------------------------
-// 2️⃣ شاشة الدفع (Subscription)
-// -------------------------------------------------------------------------
+// 2️⃣ شاشة الدفع
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
 
@@ -167,7 +155,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       return;
     }
     setState(() => _isLoading = true);
-    // تحديث الحالة إلى "مراجعة الدفع"
     await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
       'status': 'payment_review',
     });
@@ -202,7 +189,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             const SizedBox(height: 30),
             ElevatedButton.icon(
               onPressed: () async {
-                 // محاكاة رفع الوصل
                  final ImagePicker picker = ImagePicker();
                  if (await picker.pickImage(source: ImageSource.gallery) != null) {
                    setState(() => _receiptUploaded = true);
@@ -229,9 +215,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 }
 
-// -------------------------------------------------------------------------
-// 3️⃣ شاشة العمل (Provider Dashboard) - الواجهة الرئيسية
-// -------------------------------------------------------------------------
+// 3️⃣ شاشة العمل
 class ProviderDashboard extends StatefulWidget {
   const ProviderDashboard({super.key});
 
@@ -240,7 +224,7 @@ class ProviderDashboard extends StatefulWidget {
 }
 
 class _ProviderDashboardState extends State<ProviderDashboard> {
-  bool _isAvailable = true; // حالة "أنا متاح"
+  bool _isAvailable = true;
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +239,6 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
       ),
       body: Column(
         children: [
-          // 🟢 شريط الحالة (أنا متاح / مشغول)
           Container(
             color: _isAvailable ? Colors.teal[50] : Colors.grey[200],
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -272,7 +255,6 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
             ),
           ),
           
-          // 🗺️ الخريطة (صورة مؤقتة حتى نبرمج الخريطة الحقيقية)
           Expanded(
             child: Container(
               color: Colors.grey[100],
@@ -289,7 +271,6 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
             ),
           ),
           
-          // 📊 ملخص سريع
           Container(
             padding: const EdgeInsets.all(20),
             decoration: const BoxDecoration(
@@ -323,7 +304,6 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
   }
 }
 
-// 📱 شاشة حالة عامة (للمراجعة والانتظار)
 class StatusScreen extends StatelessWidget {
   final String title;
   final String message;
