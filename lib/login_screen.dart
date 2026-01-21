@@ -47,7 +47,10 @@ class _LoginScreenState extends State<LoginScreen> {
            } else if (role == 'provider') {
              // 🚑 توجيه الممرض (مؤقتاً نعرض رسالة حتى نبرمج لوحته)
              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("أهلاً بك يا شريك العافية! (جاري تجهيز لوحتك)")));
-             // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProviderDashboard()));
+             import 'package:afya_dz/provider.dart'; // لا تنسى الإستيراد في الأعلى
+...
+Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProviderGate()));
+
            }
         }
       }
