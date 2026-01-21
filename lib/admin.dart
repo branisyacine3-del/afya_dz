@@ -1,7 +1,8 @@
+import 'dart:convert'; // 👈 ضروري
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'login_screen.dart'; // ✅ صحيح
+import 'login_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -58,10 +59,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     );
   }
 }
-
-// (أبقي باقي الكود الخاص بـ Admin كما هو، فقط غير الاستيراد في الأعلى)
-// ... انسخ الكود السابق لـ _StaffManagementTab و _RequestsTab و _ServicesTab هنا ...
-// سأعيد كتابة الأجزاء السفلية لضمان النسخ الكامل:
 
 class _StaffManagementTab extends StatelessWidget {
   const _StaffManagementTab();
@@ -132,7 +129,7 @@ class _StaffManagementTab extends StatelessWidget {
     if (status == 'payment_review') {
       return ElevatedButton(
         style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-        onPressed: () => _showPaymentDialog(context, uid),
+        onPressed: () => _showPaymentDialog(context, uid, data),
         child: const Text("تأكيد الدفع", style: TextStyle(color: Colors.white)),
       );
     }
@@ -144,15 +141,17 @@ class _StaffManagementTab extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("مراجعة الوثائق"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("هنا ستظهر صور الوثائق (البطاقة، الشهادة...)"),
-            const SizedBox(height: 10),
-            Container(height: 100, color: Colors.grey[300], child: const Center(child: Text("صورة البطاقة"))),
-            const SizedBox(height: 5),
-            Container(height: 100, color: Colors.grey[300], child: const Center(child: Text("صورة الشهادة"))),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("بطاقة التعريف:"),
+              _decodeImage(data['id_card_image']),
+              const SizedBox(height: 10),
+              const Text("الدبلوم:"),
+              _decodeImage(data['diploma_image']),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -168,14 +167,14 @@ class _StaffManagementTab extends StatelessWidget {
               Navigator.pop(ctx);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text("قبول (تحويل للدفع)"),
+            child: const Text("قبول"),
           ),
         ],
       ),
     );
   }
 
-  void _showPaymentDialog(BuildContext context, String uid) {
+  void _showPaymentDialog(BuildContext context, String uid, Map<String, dynamic> data) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -183,9 +182,10 @@ class _StaffManagementTab extends StatelessWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(height: 150, color: Colors.blue[100], child: const Center(child: Text("صورة الوصل"))),
+            const Text("وصل الدفع:"),
+            _decodeImage(data['receipt_image']),
             const SizedBox(height: 10),
-            const Text("هل وصل المبلغ (3500 دج) إلى حسابك؟"),
+            const Text("هل وصل المبلغ (3500 دج)؟"),
           ],
         ),
         actions: [
@@ -199,11 +199,21 @@ class _StaffManagementTab extends StatelessWidget {
               Navigator.pop(ctx);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text("نعم، تفعيل الاشتراك"),
+            child: const Text("تفعيل"),
           ),
         ],
       ),
     );
+  }
+
+  // 🖼️ دالة فك التشفير وعرض الصورة
+  Widget _decodeImage(String? base64String) {
+    if (base64String == null) return Container(height: 100, color: Colors.grey, child: const Center(child: Text("لا توجد صورة")));
+    try {
+      return Image.memory(base64Decode(base64String), height: 150, fit: BoxFit.cover);
+    } catch (e) {
+      return const Text("خطأ في عرض الصورة");
+    }
   }
 }
 
@@ -226,11 +236,21 @@ class _RequestsTab extends StatelessWidget {
           itemBuilder: (context, index) {
             var data = docs[index].data() as Map<String, dynamic>;
             return Card(
-              child: ListTile(
+              child: ExpansionTile(
                 leading: const Icon(Icons.medical_services, color: Colors.teal),
                 title: Text(data['service'] ?? "خدمة"),
-                subtitle: Text("${data['patient_name']} \n📍 ${data['location']}"),
-                trailing: Text(data['status'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                subtitle: Text("${data['patient_name']} - ${data['status']}"),
+                children: [
+                   if (data['image_data'] != null)
+                     Padding(
+                       padding: const EdgeInsets.all(8.0),
+                       child: Image.memory(base64Decode(data['image_data']), height: 200),
+                     ),
+                   Padding(
+                     padding: const EdgeInsets.all(8.0),
+                     child: Text("تفاصيل: ${data['details'] ?? 'لا يوجد'}"),
+                   )
+                ],
               ),
             );
           },
