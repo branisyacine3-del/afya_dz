@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'package:afya_dz/screens/splash_screen.dart'; // 👈 استدعاء الشاشة الجديدة
+import 'firebase_options.dart'; // ✅ صحيح: الملف بجانبنا
+import 'splash_screen.dart';    // ✅ تم التصحيح: حذفنا كلمة screens/ لأن الملف بجانبنا
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // تهيئة فايربيز
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
   runApp(const AfyaApp());
 }
 
@@ -20,12 +23,13 @@ class AfyaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Afya DZ',
       theme: ThemeData(
-        fontFamily: 'Cairo', // سنجعل الخط موحداً
+        fontFamily: 'Cairo', // توحيد الخط
         primarySwatch: Colors.teal,
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF5F5F5),
       ),
-      home: const SplashScreen(), // 👈 البداية من هنا
+      // نقطة البداية هي شاشة السبلاش
+      home: const SplashScreen(),
     );
   }
 }
- 
