@@ -1,87 +1,129 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart'; // لرفع صور الوثائق
 
-// 💰 شاشة الدفع (تظهر في حالتين: حساب جديد أو اشتراك منتهي)
-class ProviderPaymentScreen extends StatelessWidget {
-  final String status; // 'pending' (جديد) أو 'expired' (منتهي)
-  const ProviderPaymentScreen({super.key, required this.status});
+// 🚦 البوابة الذكية للممرض (توجهك حسب حالتك)
+class ProviderGate extends StatelessWidget {
+  const ProviderGate({super.key});
 
-  // دالة فتح الواتساب لإرسال الوصل
-  Future<void> _contactAdmin() async {
-    // رقمك بصيغة دولية (بدون 0)
-    final Uri url = Uri.parse("https://wa.me/213562898252?text=السلام عليكم، أرسلت لك وصل دفع الاشتراك.");
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      debugPrint("لا يمكن فتح الواتساب");
+  @override
+  Widget build(BuildContext context) {
+    final userId = FirebaseAuth.instance.currentUser!.uid;
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+
+        var data = snapshot.data!.data() as Map<String, dynamic>;
+        String status = data['status'] ?? 'pending_docs'; // الحالة الافتراضية
+
+        // 1️⃣ مرحلة رفع الوثائق
+        if (status == 'pending_docs') return const VerificationScreen();
+        
+        // ⏳ مرحلة انتظار مراجعة الوثائق
+        if (status == 'under_review') return const StatusScreen(
+          title: "جاري مراجعة وثائقك 📄",
+          message: "فريق عافية يتحقق من وثائقك حالياً. ستصلك رسالة قريباً للمرور لمرحلة الدفع.",
+          icon: Icons.hourglass_top,
+          color: Colors.orange,
+        );
+
+        // 2️⃣ مرحلة الدفع (الاشتراك)
+        if (status == 'pending_payment') return const SubscriptionScreen();
+
+        // ⏳ مرحلة انتظار تأكيد الدفع
+        if (status == 'payment_review') return const StatusScreen(
+          title: "جاري تأكيد الدفع 💸",
+          message: "وصلنا إيصال الدفع الخاص بك. سيتم تفعيل حسابك في أقل من 24 ساعة.",
+          icon: Icons.payments,
+          color: Colors.blue,
+        );
+
+        // 3️⃣ مرحلة العمل (مفعل)
+        if (status == 'active') return const ProviderDashboard();
+
+        // ❌ مرحلة الرفض
+        return const StatusScreen(
+          title: "عذراً",
+          message: "تم رفض طلبك لعدم استيفاء الشروط. يرجى التواصل مع الإدارة.",
+          icon: Icons.block,
+          color: Colors.red,
+        );
+      },
+    );
+  }
+}
+
+// -------------------------------------------------------------------------
+// 1️⃣ شاشة رفع الوثائق (Verification)
+// -------------------------------------------------------------------------
+class VerificationScreen extends StatefulWidget {
+  const VerificationScreen({super.key});
+
+  @override
+  State<VerificationScreen> createState() => _VerificationScreenState();
+}
+
+class _VerificationScreenState extends State<VerificationScreen> {
+  // متغيرات لحفظ هل تم رفع الصور (محاكاة)
+  bool _idUploaded = false;
+  bool _diplomaUploaded = false;
+  bool _photoUploaded = false;
+  bool _isLoading = false;
+
+  Future<void> _pickImage(String type) async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (image != null) {
+      // هنا المفروض نرفع الصورة لـ Firebase Storage
+      // حالياً سنكتفي بتحديث الواجهة لمحاكاة الرفع
+      setState(() {
+        if (type == 'id') _idUploaded = true;
+        if (type == 'diploma') _diplomaUploaded = true;
+        if (type == 'photo') _photoUploaded = true;
+      });
     }
+  }
+
+  Future<void> _submitDocs() async {
+    if (!_idUploaded || !_diplomaUploaded || !_photoUploaded) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى رفع جميع الوثائق المطلوبة")));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    // تحديث الحالة إلى "قيد المراجعة"
+    await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
+      'status': 'under_review',
+    });
+    setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    bool isExpired = status == 'expired';
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isExpired ? "تجديد الاشتراك" : "تفعيل الحساب"),
-        backgroundColor: Colors.indigo,
-        actions: [IconButton(onPressed: () => FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout))],
-      ),
+      appBar: AppBar(title: const Text("تفعيل الحساب (1/2)"), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Icon(isExpired ? Icons.history_toggle_off : Icons.verified_user, size: 80, color: isExpired ? Colors.red : Colors.orange),
+            const Text("يرجى رفع الوثائق التالية لإثبات هويتك", style: TextStyle(fontSize: 16, color: Colors.grey)),
             const SizedBox(height: 20),
-            Text(
-              isExpired ? "انتهت فترة اشتراكك 🛑" : "مرحباً بك في فريق عافية 👋",
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              isExpired 
-                ? "لقد تجاوزت 30 يوماً. يرجى تجديد الاشتراك لاستقبال الطلبات مجدداً."
-                : "حسابك قيد الانتظار. لتفعيل الحساب وبدء العمل، يرجى دفع اشتراك الشهر الأول.",
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, fontSize: 16),
-            ),
+            _buildUploadCard("بطاقة التعريف الوطنية", Icons.badge, _idUploaded, () => _pickImage('id')),
+            _buildUploadCard("الشهادة / الدبلوم", Icons.school, _diplomaUploaded, () => _pickImage('diploma')),
+            _buildUploadCard("صورة شخصية حديثة", Icons.person_pin, _photoUploaded, () => _pickImage('photo')),
             const SizedBox(height: 30),
-
-            // 💳 بطاقة معلومات الدفع
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: Colors.indigo.shade100),
-                boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 10)],
-              ),
-              child: Column(
-                children: [
-                  const Text("معلومات الدفع (CCP)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.indigo)),
-                  const Divider(),
-                  _infoRow("الاسم:", "Branis Yacine"),
-                  _infoRow("CCP:", "0028939081"),
-                  _infoRow("Clé:", "97"),
-                  const Divider(),
-                  _infoRow("BaridiMob:", "00799999002893908197"),
-                  const Divider(),
-                  const Text("قيمة الاشتراك: 3500 دج / شهر", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 30),
-            
-            // زر الواتساب
             SizedBox(
               width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                onPressed: _contactAdmin,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                icon: const Icon(Icons.chat),
-                label: const Text("أرسل وصل الدفع عبر الواتساب", style: TextStyle(fontSize: 16)),
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _submitDocs,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text("إرسال للمراجعة", style: TextStyle(color: Colors.white, fontSize: 18)),
               ),
             ),
           ],
@@ -90,43 +132,224 @@ class ProviderPaymentScreen extends StatelessWidget {
     );
   }
 
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          SelectableText(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        ],
+  Widget _buildUploadCard(String title, IconData icon, bool isUploaded, VoidCallback onTap) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 15),
+      child: ListTile(
+        leading: Icon(icon, color: Colors.teal, size: 30),
+        title: Text(title),
+        trailing: isUploaded 
+            ? const Icon(Icons.check_circle, color: Colors.green) 
+            : const Icon(Icons.upload_file, color: Colors.grey),
+        onTap: onTap,
       ),
     );
   }
 }
 
-// 🚑 لوحة التحكم (للممرض المفعل فقط)
-class ProviderDashboard extends StatelessWidget {
+// -------------------------------------------------------------------------
+// 2️⃣ شاشة الدفع (Subscription)
+// -------------------------------------------------------------------------
+class SubscriptionScreen extends StatefulWidget {
+  const SubscriptionScreen({super.key});
+
+  @override
+  State<SubscriptionScreen> createState() => _SubscriptionScreenState();
+}
+
+class _SubscriptionScreenState extends State<SubscriptionScreen> {
+  bool _receiptUploaded = false;
+  bool _isLoading = false;
+
+  Future<void> _submitPayment() async {
+    if (!_receiptUploaded) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى إرفاق صورة الوصل")));
+      return;
+    }
+    setState(() => _isLoading = true);
+    // تحديث الحالة إلى "مراجعة الدفع"
+    await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
+      'status': 'payment_review',
+    });
+    setState(() => _isLoading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("اشتراك عافية (2/2)"), backgroundColor: Colors.teal, foregroundColor: Colors.white),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Icon(Icons.workspace_premium, size: 60, color: Colors.orange),
+            const SizedBox(height: 10),
+            const Text("تفعيل الاشتراك الشهري", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text("مبلغ الاشتراك: 3500 دج / شهر", style: TextStyle(fontSize: 18, color: Colors.teal, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 30),
+            Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(10)),
+              child: const Column(
+                children: [
+                  Text("بيانات الدفع (BaridiMob)", style: TextStyle(fontWeight: FontWeight.bold)),
+                  Divider(),
+                  Text("RIP: 00799999002893908197", style: TextStyle(fontSize: 18, letterSpacing: 1.5)),
+                  Text("الاسم: BRANIS YACINE"),
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton.icon(
+              onPressed: () async {
+                 // محاكاة رفع الوصل
+                 final ImagePicker picker = ImagePicker();
+                 if (await picker.pickImage(source: ImageSource.gallery) != null) {
+                   setState(() => _receiptUploaded = true);
+                 }
+              },
+              icon: Icon(_receiptUploaded ? Icons.check : Icons.camera_alt),
+              label: Text(_receiptUploaded ? "تم إرفاق الوصل" : "إرفاق وصل الدفع"),
+              style: ElevatedButton.styleFrom(backgroundColor: _receiptUploaded ? Colors.green : Colors.blue, foregroundColor: Colors.white),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _submitPayment,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                child: const Text("تأكيد الدفع", style: TextStyle(color: Colors.white, fontSize: 18)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// -------------------------------------------------------------------------
+// 3️⃣ شاشة العمل (Provider Dashboard) - الواجهة الرئيسية
+// -------------------------------------------------------------------------
+class ProviderDashboard extends StatefulWidget {
   const ProviderDashboard({super.key});
+
+  @override
+  State<ProviderDashboard> createState() => _ProviderDashboardState();
+}
+
+class _ProviderDashboardState extends State<ProviderDashboard> {
+  bool _isAvailable = true; // حالة "أنا متاح"
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("مساحة العمل"),
-        backgroundColor: Colors.indigo,
-        actions: [IconButton(onPressed: () => FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout))],
+        title: const Text("لوحة العمل 🚑"),
+        backgroundColor: _isAvailable ? Colors.teal : Colors.grey,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(icon: const Icon(Icons.exit_to_app), onPressed: () => FirebaseAuth.instance.signOut()),
+        ],
       ),
-      body: Center(
+      body: Column(
+        children: [
+          // 🟢 شريط الحالة (أنا متاح / مشغول)
+          Container(
+            color: _isAvailable ? Colors.teal[50] : Colors.grey[200],
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(_isAvailable ? "🟢 أنت متصل (تتلقى طلبات)" : "🔴 أنت غير متصل", style: const TextStyle(fontWeight: FontWeight.bold)),
+                Switch(
+                  value: _isAvailable,
+                  activeColor: Colors.teal,
+                  onChanged: (val) => setState(() => _isAvailable = val),
+                ),
+              ],
+            ),
+          ),
+          
+          // 🗺️ الخريطة (صورة مؤقتة حتى نبرمج الخريطة الحقيقية)
+          Expanded(
+            child: Container(
+              color: Colors.grey[100],
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.map, size: 80, color: Colors.grey[300]),
+                    const SizedBox(height: 10),
+                    const Text("جاري البحث عن طلبات قريبة...", style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          // 📊 ملخص سريع
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStat("رصيدك", "0 دج", Icons.account_balance_wallet, Colors.green),
+                _buildStat("طلبات اليوم", "0", Icons.list_alt, Colors.blue),
+                _buildStat("التقييم", "5.0", Icons.star, Colors.orange),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStat(String label, String value, IconData icon, Color color) {
+    return Column(
+      children: [
+        Icon(icon, color: color),
+        const SizedBox(height: 5),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      ],
+    );
+  }
+}
+
+// 📱 شاشة حالة عامة (للمراجعة والانتظار)
+class StatusScreen extends StatelessWidget {
+  final String title;
+  final String message;
+  final IconData icon;
+  final Color color;
+
+  const StatusScreen({super.key, required this.title, required this.message, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Padding(
+        padding: const EdgeInsets.all(30),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.radar, size: 80, color: Colors.indigo),
+            Icon(icon, size: 80, color: color),
             const SizedBox(height: 20),
-            const Text("جاري البحث عن طلبات قريبة...", style: TextStyle(fontSize: 20)),
+            Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            const CircularProgressIndicator(),
-            const SizedBox(height: 30),
-            const Text("اشتراكك ساري ✅", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+            const SizedBox(height: 40),
+            TextButton(
+              onPressed: () => FirebaseAuth.instance.signOut(),
+              child: const Text("تسجيل الخروج", style: TextStyle(color: Colors.grey)),
+            )
           ],
         ),
       ),
