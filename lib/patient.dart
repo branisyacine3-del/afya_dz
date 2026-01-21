@@ -1,9 +1,11 @@
+import 'dart:convert'; // 👈 ضرورية لتحويل الصورة
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
-import 'login_screen.dart'; // ✅ صحيح
+import 'login_screen.dart';
 
 class PatientHome extends StatelessWidget {
   const PatientHome({super.key});
@@ -216,7 +218,7 @@ class _BookingScreenState extends State<BookingScreen> {
   
   bool _isLoading = false;
   String? _location;
-  bool _hasImage = false;
+  String? _base64Image; // 👈 المتغير الجديد للصورة المشفرة
 
   Future<void> _getLocation() async {
     setState(() => _isLoading = true);
@@ -230,6 +232,23 @@ class _BookingScreenState extends State<BookingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تعذر تحديد الموقع")));
     }
     setState(() => _isLoading = false);
+  }
+
+  // 📸 دالة تحويل الصورة إلى نص
+  Future<void> _pickAndConvertImage() async {
+    final ImagePicker picker = ImagePicker();
+    // imageQuality: 50 مهم جداً لتقليل الحجم
+    final XFile? image = await picker.pickImage(source: ImageSource.camera, imageQuality: 50);
+    
+    if (image != null) {
+      File file = File(image.path);
+      List<int> imageBytes = await file.readAsBytes();
+      String base64String = base64Encode(imageBytes);
+      
+      setState(() {
+        _base64Image = base64String;
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -252,7 +271,7 @@ class _BookingScreenState extends State<BookingScreen> {
         'location': _location ?? "لم يحدد الموقع",
         'wilaya': wilaya,
         'status': 'pending',
-        'has_image': _hasImage,
+        'image_data': _base64Image, // 👈 إرسال كود الصورة
         'created_at': FieldValue.serverTimestamp(),
       });
 
@@ -289,14 +308,9 @@ class _BookingScreenState extends State<BookingScreen> {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () async {
-                         final ImagePicker picker = ImagePicker();
-                         if (await picker.pickImage(source: ImageSource.camera) != null) {
-                           setState(() => _hasImage = true);
-                         }
-                      },
-                      icon: Icon(_hasImage ? Icons.check : Icons.camera_alt),
-                      label: Text(_hasImage ? "تم التصوير" : "صورة (اختياري)"),
+                      onPressed: _pickAndConvertImage, // 👈 استدعاء الدالة الجديدة
+                      icon: Icon(_base64Image != null ? Icons.check : Icons.camera_alt),
+                      label: Text(_base64Image != null ? "تم التصوير" : "صورة (اختياري)"),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
                     ),
                   ),
