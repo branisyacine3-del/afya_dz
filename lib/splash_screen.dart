@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:afya_dz/screens/onboarding_screen.dart'; // سننشئها بعد قليل
+import 'onboarding_screen.dart'; // ✅ تم التصحيح (بدون screens/)
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -7,7 +7,8 @@ class SplashScreen extends StatefulWidget {
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
-
+// ... (باقي الكود كما هو) ...
+// تأكد فقط من نسخ الكود القديم كاملاً، التغيير فقط في السطر الثاني
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
@@ -43,14 +44,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.teal, // لون طبي مريح
+      backgroundColor: Colors.teal,
       body: Center(
         child: FadeTransition(
           opacity: _animation,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 🟢 الشعار (مؤقتاً أيقونة حتى تجهز الصورة)
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: const BoxDecoration(
@@ -60,18 +60,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 child: const Icon(Icons.medical_services_rounded, size: 80, color: Colors.teal),
               ),
               const SizedBox(height: 20),
-              // 🟢 اسم التطبيق
               const Text(
                 "عافية",
                 style: TextStyle(
                   fontSize: 40,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
-                  fontFamily: 'Cairo', // خط عربي جميل (تلقائي)
+                  fontFamily: 'Cairo',
                 ),
               ),
               const SizedBox(height: 10),
-              // 🟢 الشعار اللفظي (Slogan)
               const Text(
                 "عافيتك.. في منزلك ❤️",
                 style: TextStyle(
@@ -89,3 +87,4 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
   }
 }
+ 
