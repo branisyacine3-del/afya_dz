@@ -1,5 +1,5 @@
 name: afya_dz
-description: Afya DZ App - Full Version.
+description: Afya DZ App.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,14 +9,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
-  # ✅ إعادة مكتبات فايربيز
   firebase_core: ^2.27.0
   firebase_auth: ^4.17.8
   cloud_firestore: ^4.15.8
-  
-  # ✅ أدوات التواصل
-  url_launcher: ^6.2.5
+  image_picker: ^1.0.7
+  geolocator: ^11.0.0
+  permission_handler: ^11.3.0
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
