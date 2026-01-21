@@ -1,9 +1,9 @@
-import 'dart:convert'; // 👈 ضروري
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:image_picker/image_picker.dart'; // ✅ هذا السطر هو الحل
 
 class ProviderGate extends StatelessWidget {
   const ProviderGate({super.key});
@@ -53,7 +53,6 @@ class ProviderGate extends StatelessWidget {
   }
 }
 
-// 1️⃣ شاشة رفع الوثائق
 class VerificationScreen extends StatefulWidget {
   const VerificationScreen({super.key});
 
@@ -62,7 +61,6 @@ class VerificationScreen extends StatefulWidget {
 }
 
 class _VerificationScreenState extends State<VerificationScreen> {
-  // متغيرات النصوص المشفرة
   String? _idBase64;
   String? _diplomaBase64;
   String? _photoBase64;
@@ -70,7 +68,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   Future<void> _pickAndConvert(String type) async {
     final ImagePicker picker = ImagePicker();
-    // ضغط الصورة مهم جداً
     final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 40);
     
     if (image != null) {
@@ -146,7 +143,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
   }
 }
 
-// 2️⃣ شاشة الدفع
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
 
@@ -228,7 +224,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 }
 
-// 3️⃣ شاشة العمل
 class ProviderDashboard extends StatefulWidget {
   const ProviderDashboard({super.key});
 
@@ -258,7 +253,7 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(_isAvailable ? "🟢 أنت متصل (تتلقى طلبات)" : "🔴 أنت غير متصل", style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(_isAvailable ? "🟢 أنت متصل" : "🔴 أنت غير متصل", style: const TextStyle(fontWeight: FontWeight.bold)),
                 Switch(
                   value: _isAvailable,
                   activeColor: Colors.teal,
@@ -267,52 +262,20 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
               ],
             ),
           ),
-          
           Expanded(
-            child: Container(
-              color: Colors.grey[100],
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.map, size: 80, color: Colors.grey[300]),
-                    const SizedBox(height: 10),
-                    const Text("جاري البحث عن طلبات قريبة...", style: TextStyle(color: Colors.grey)),
-                  ],
-                ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.map, size: 80, color: Colors.grey[300]),
+                  const SizedBox(height: 10),
+                  const Text("جاري البحث عن طلبات...", style: TextStyle(color: Colors.grey)),
+                ],
               ),
-            ),
-          ),
-          
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStat("رصيدك", "0 دج", Icons.account_balance_wallet, Colors.green),
-                _buildStat("طلبات اليوم", "0", Icons.list_alt, Colors.blue),
-                _buildStat("التقييم", "5.0", Icons.star, Colors.orange),
-              ],
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStat(String label, String value, IconData icon, Color color) {
-    return Column(
-      children: [
-        Icon(icon, color: color),
-        const SizedBox(height: 5),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      ],
     );
   }
 }
