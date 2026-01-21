@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:afya_dz/screens/login_screen.dart';
+import 'login_screen.dart'; // ✅ صحيح
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -32,9 +32,9 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
           labelColor: Colors.white,
           unselectedLabelColor: Colors.grey,
           tabs: const [
-            Tab(icon: Icon(Icons.people_alt), text: "إدارة الطاقم"), // للموافقة على الممرضين
-            Tab(icon: Icon(Icons.list_alt), text: "الطلبات الحية"),  // طلبات المرضى
-            Tab(icon: Icon(Icons.settings), text: "الخدمات والأسعار"), // التحكم في الأسعار
+            Tab(icon: Icon(Icons.people_alt), text: "إدارة الطاقم"),
+            Tab(icon: Icon(Icons.list_alt), text: "الطلبات الحية"),
+            Tab(icon: Icon(Icons.settings), text: "الخدمات والأسعار"),
           ],
         ),
         actions: [
@@ -59,16 +59,16 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   }
 }
 
-// -------------------------------------------------------------------------
-// 1️⃣ قسم إدارة الطاقم (الموافقة على الوثائق والدفع)
-// -------------------------------------------------------------------------
+// (أبقي باقي الكود الخاص بـ Admin كما هو، فقط غير الاستيراد في الأعلى)
+// ... انسخ الكود السابق لـ _StaffManagementTab و _RequestsTab و _ServicesTab هنا ...
+// سأعيد كتابة الأجزاء السفلية لضمان النسخ الكامل:
+
 class _StaffManagementTab extends StatelessWidget {
   const _StaffManagementTab();
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      // نجلب فقط الممرضين/الشركاء
       stream: FirebaseFirestore.instance.collection('users')
           .where('role', isEqualTo: 'provider')
           .orderBy('created_at', descending: true)
@@ -88,9 +88,9 @@ class _StaffManagementTab extends StatelessWidget {
             String uid = docs[index].id;
 
             Color cardColor = Colors.white;
-            if (status == 'under_review') cardColor = Colors.orange.shade50; // يحتاج مراجعة وثائق
-            if (status == 'payment_review') cardColor = Colors.blue.shade50; // يحتاج تأكيد دفع
-            if (status == 'active') cardColor = Colors.green.shade50; // مفعل
+            if (status == 'under_review') cardColor = Colors.orange.shade50;
+            if (status == 'payment_review') cardColor = Colors.blue.shade50;
+            if (status == 'active') cardColor = Colors.green.shade50;
 
             return Card(
               color: cardColor,
@@ -139,7 +139,6 @@ class _StaffManagementTab extends StatelessWidget {
     return const Icon(Icons.more_vert);
   }
 
-  // نافذة فحص الوثائق
   void _showDocsDialog(BuildContext context, String uid, Map<String, dynamic> data) {
     showDialog(
       context: context,
@@ -150,7 +149,6 @@ class _StaffManagementTab extends StatelessWidget {
           children: [
             const Text("هنا ستظهر صور الوثائق (البطاقة، الشهادة...)"),
             const SizedBox(height: 10),
-            // في المستقبل نضع NetworkImage هنا لعرض الصور من Storage
             Container(height: 100, color: Colors.grey[300], child: const Center(child: Text("صورة البطاقة"))),
             const SizedBox(height: 5),
             Container(height: 100, color: Colors.grey[300], child: const Center(child: Text("صورة الشهادة"))),
@@ -159,7 +157,6 @@ class _StaffManagementTab extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () {
-              // رفض
               FirebaseFirestore.instance.collection('users').doc(uid).update({'status': 'rejected'});
               Navigator.pop(ctx);
             },
@@ -167,7 +164,6 @@ class _StaffManagementTab extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              // قبول -> تحويل لمرحلة الدفع
               FirebaseFirestore.instance.collection('users').doc(uid).update({'status': 'pending_payment'});
               Navigator.pop(ctx);
             },
@@ -179,7 +175,6 @@ class _StaffManagementTab extends StatelessWidget {
     );
   }
 
-  // نافذة تأكيد الدفع
   void _showPaymentDialog(BuildContext context, String uid) {
     showDialog(
       context: context,
@@ -196,7 +191,6 @@ class _StaffManagementTab extends StatelessWidget {
         actions: [
           ElevatedButton(
             onPressed: () {
-              // تفعيل نهائي + تحديد تاريخ الانتهاء (30 يوم)
               DateTime expiryDate = DateTime.now().add(const Duration(days: 30));
               FirebaseFirestore.instance.collection('users').doc(uid).update({
                 'status': 'active',
@@ -213,9 +207,6 @@ class _StaffManagementTab extends StatelessWidget {
   }
 }
 
-// -------------------------------------------------------------------------
-// 2️⃣ قسم الطلبات (مراقبة الحجوزات)
-// -------------------------------------------------------------------------
 class _RequestsTab extends StatelessWidget {
   const _RequestsTab();
 
@@ -249,9 +240,6 @@ class _RequestsTab extends StatelessWidget {
   }
 }
 
-// -------------------------------------------------------------------------
-// 3️⃣ قسم الخدمات (إضافة الأسعار)
-// -------------------------------------------------------------------------
 class _ServicesTab extends StatefulWidget {
   const _ServicesTab();
 
@@ -281,7 +269,6 @@ class _ServicesTabState extends State<_ServicesTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // نموذج الإضافة
         Padding(
           padding: const EdgeInsets.all(15.0),
           child: Row(
@@ -294,7 +281,6 @@ class _ServicesTabState extends State<_ServicesTab> {
           ),
         ),
         const Divider(thickness: 2),
-        // قائمة الخدمات الموجودة
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('services').snapshots(),
