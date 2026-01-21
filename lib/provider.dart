@@ -1,10 +1,10 @@
+import 'dart:convert'; // 👈 ضروري
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:image_picker/image_picker.dart'; // 👈 هذا هو السطر الذي كان مفقوداً ويسبب المشكلة
+import 'package:image_picker/image_picker.dart';
 
-// 🚦 البوابة الذكية للممرض
 class ProviderGate extends StatelessWidget {
   const ProviderGate({super.key});
 
@@ -62,26 +62,32 @@ class VerificationScreen extends StatefulWidget {
 }
 
 class _VerificationScreenState extends State<VerificationScreen> {
-  bool _idUploaded = false;
-  bool _diplomaUploaded = false;
-  bool _photoUploaded = false;
+  // متغيرات النصوص المشفرة
+  String? _idBase64;
+  String? _diplomaBase64;
+  String? _photoBase64;
   bool _isLoading = false;
 
-  Future<void> _pickImage(String type) async {
+  Future<void> _pickAndConvert(String type) async {
     final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    // ضغط الصورة مهم جداً
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 40);
     
     if (image != null) {
+      File file = File(image.path);
+      List<int> bytes = await file.readAsBytes();
+      String base64Str = base64Encode(bytes);
+
       setState(() {
-        if (type == 'id') _idUploaded = true;
-        if (type == 'diploma') _diplomaUploaded = true;
-        if (type == 'photo') _photoUploaded = true;
+        if (type == 'id') _idBase64 = base64Str;
+        if (type == 'diploma') _diplomaBase64 = base64Str;
+        if (type == 'photo') _photoBase64 = base64Str;
       });
     }
   }
 
   Future<void> _submitDocs() async {
-    if (!_idUploaded || !_diplomaUploaded || !_photoUploaded) {
+    if (_idBase64 == null || _diplomaBase64 == null || _photoBase64 == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى رفع جميع الوثائق المطلوبة")));
       return;
     }
@@ -89,6 +95,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
     setState(() => _isLoading = true);
     await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
       'status': 'under_review',
+      'id_card_image': _idBase64,
+      'diploma_image': _diplomaBase64,
+      'personal_image': _photoBase64,
     });
     setState(() => _isLoading = false);
   }
@@ -103,9 +112,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
           children: [
             const Text("يرجى رفع الوثائق التالية لإثبات هويتك", style: TextStyle(fontSize: 16, color: Colors.grey)),
             const SizedBox(height: 20),
-            _buildUploadCard("بطاقة التعريف الوطنية", Icons.badge, _idUploaded, () => _pickImage('id')),
-            _buildUploadCard("الشهادة / الدبلوم", Icons.school, _diplomaUploaded, () => _pickImage('diploma')),
-            _buildUploadCard("صورة شخصية حديثة", Icons.person_pin, _photoUploaded, () => _pickImage('photo')),
+            _buildUploadCard("بطاقة التعريف الوطنية", Icons.badge, _idBase64 != null, () => _pickAndConvert('id')),
+            _buildUploadCard("الشهادة / الدبلوم", Icons.school, _diplomaBase64 != null, () => _pickAndConvert('diploma')),
+            _buildUploadCard("صورة شخصية حديثة", Icons.person_pin, _photoBase64 != null, () => _pickAndConvert('photo')),
             const SizedBox(height: 30),
             SizedBox(
               width: double.infinity,
@@ -146,17 +155,18 @@ class SubscriptionScreen extends StatefulWidget {
 }
 
 class _SubscriptionScreenState extends State<SubscriptionScreen> {
-  bool _receiptUploaded = false;
+  String? _receiptBase64;
   bool _isLoading = false;
 
   Future<void> _submitPayment() async {
-    if (!_receiptUploaded) {
+    if (_receiptBase64 == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى إرفاق صورة الوصل")));
       return;
     }
     setState(() => _isLoading = true);
     await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
       'status': 'payment_review',
+      'receipt_image': _receiptBase64,
     });
     setState(() => _isLoading = false);
   }
@@ -190,13 +200,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ElevatedButton.icon(
               onPressed: () async {
                  final ImagePicker picker = ImagePicker();
-                 if (await picker.pickImage(source: ImageSource.gallery) != null) {
-                   setState(() => _receiptUploaded = true);
+                 final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 40);
+                 if (image != null) {
+                    File file = File(image.path);
+                    String base64Str = base64Encode(await file.readAsBytes());
+                    setState(() => _receiptBase64 = base64Str);
                  }
               },
-              icon: Icon(_receiptUploaded ? Icons.check : Icons.camera_alt),
-              label: Text(_receiptUploaded ? "تم إرفاق الوصل" : "إرفاق وصل الدفع"),
-              style: ElevatedButton.styleFrom(backgroundColor: _receiptUploaded ? Colors.green : Colors.blue, foregroundColor: Colors.white),
+              icon: Icon(_receiptBase64 != null ? Icons.check : Icons.camera_alt),
+              label: Text(_receiptBase64 != null ? "تم إرفاق الوصل" : "إرفاق وصل الدفع"),
+              style: ElevatedButton.styleFrom(backgroundColor: _receiptBase64 != null ? Colors.green : Colors.blue, foregroundColor: Colors.white),
             ),
             const Spacer(),
             SizedBox(
