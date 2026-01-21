@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:afya_dz/screens/login_screen.dart';
 
 class PatientHome extends StatelessWidget {
   const PatientHome({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("عافية - خدمات طبية"),
@@ -18,96 +23,162 @@ class PatientHome extends StatelessWidget {
             icon: const Icon(Icons.exit_to_app),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
+              if (context.mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            children: [
-              // 🟢 بطاقة الترحيب (نفس تصميمك)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.teal,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Column(
-                  children: [
-                    Text("مرحباً بك ❤️", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 10),
-                    Text("اختر الخدمة التي تحتاجها وسنصلك فوراً", style: TextStyle(color: Colors.white, fontSize: 16)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
+      // فحص: هل لدى المريض طلب نشط حالياً؟
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('requests')
+            .where('user_id', isEqualTo: user!.uid)
+            .where('status', whereIn: ['pending', 'accepted', 'on_way']) // الحالات النشطة
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          
+          // 1️⃣ إذا كان هناك طلب نشط -> اعرض شاشة التتبع (الرادار)
+          if (snapshot.data!.docs.isNotEmpty) {
+            var request = snapshot.data!.docs.first;
+            return _buildTrackingScreen(request);
+          }
 
-              // 🏥 شبكة الخدمات
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 15,
-                mainAxisSpacing: 15,
-                children: [
-                  // 👇 زر ممرض منزلي (مفعل وينقلك للاستمارة)
-                  _ServiceCard(
-                    title: "ممرض منزلي",
-                    icon: Icons.medical_services_outlined,
-                    color: Colors.teal,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const BookingScreen(serviceName: "ممرض منزلي")),
-                      );
-                    },
-                  ),
-                  // بقية الخدمات (ستظهر رسالة "قريباً")
-                  _ServiceCard(
-                    title: "طبيب عام",
-                    icon: Icons.person,
-                    color: Colors.blue,
-                    onTap: () => _showComingSoon(context),
-                  ),
-                  _ServiceCard(
-                    title: "سيارة إسعاف",
-                    icon: Icons.local_hospital,
-                    color: Colors.red,
-                    onTap: () => _showComingSoon(context),
-                  ),
-                  _ServiceCard(
-                    title: "رعاية مسنين",
-                    icon: Icons.elderly,
-                    color: Colors.orange,
-                    onTap: () => _showComingSoon(context),
-                  ),
-                ],
+          // 2️⃣ إذا لم يكن هناك طلب -> اعرض قائمة الخدمات
+          return _buildServicesList(context, user);
+        },
+      ),
+    );
+  }
+
+  // 📡 شاشة التتبع (الرادار)
+  Widget _buildTrackingScreen(DocumentSnapshot request) {
+    var data = request.data() as Map<String, dynamic>;
+    String status = data['status'];
+
+    String statusText = "جاري البحث عن ممرض...";
+    IconData statusIcon = Icons.radar;
+    Color statusColor = Colors.orange;
+
+    if (status == 'accepted') {
+      statusText = "تم قبول طلبك! الممرض يجهز نفسه.";
+      statusIcon = Icons.check_circle;
+      statusColor = Colors.blue;
+    } else if (status == 'on_way') {
+      statusText = "الممرض في الطريق إليك 🚑";
+      statusIcon = Icons.directions_car;
+      statusColor = Colors.green;
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(30.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // محاكاة الرادار
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(Icons.circle, size: 200, color: statusColor.withOpacity(0.1)),
+                Icon(Icons.circle, size: 150, color: statusColor.withOpacity(0.2)),
+                Icon(statusIcon, size: 80, color: statusColor),
+              ],
+            ),
+            const SizedBox(height: 30),
+            Text(statusText, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Text("الخدمة: ${data['service']} (${data['price']} دج)", style: const TextStyle(fontSize: 16, color: Colors.grey)),
+            const SizedBox(height: 40),
+            
+            // زر إلغاء الطلب (فقط إذا كان قيد الانتظار)
+            if (status == 'pending')
+              OutlinedButton.icon(
+                onPressed: () {
+                  request.reference.delete();
+                },
+                icon: const Icon(Icons.cancel, color: Colors.red),
+                label: const Text("إلغاء الطلب", style: TextStyle(color: Colors.red)),
               ),
-            ],
-          ),
+              
+            if (status != 'pending')
+               const Text("لا يمكن الإلغاء، الممرض قادم.", style: TextStyle(color: Colors.grey))
+          ],
         ),
       ),
     );
   }
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("هذه الخدمة ستتوفر قريباً!")),
+  // 🏥 قائمة الخدمات (من الفايربيز)
+  Widget _buildServicesList(BuildContext context, User user) {
+    return Column(
+      children: [
+        // بانر ترحيبي
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          color: Colors.teal.shade50,
+          child: Column(
+            children: [
+              Text("مرحباً بك يا ${user.email!.split('@')[0]}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.teal)),
+              const Text("اختر الخدمة التي تحتاجها الآن", style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+        
+        // الشبكة
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('services').where('active', isEqualTo: true).snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              var services = snapshot.data!.docs;
+
+              if (services.isEmpty) {
+                return const Center(child: Text("لا توجد خدمات متاحة حالياً\n(اطلب من المدير إضافة خدمات)", textAlign: TextAlign.center));
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(15),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 15,
+                  mainAxisSpacing: 15,
+                  childAspectRatio: 1.1,
+                ),
+                itemCount: services.length,
+                itemBuilder: (context, index) {
+                  var service = services[index].data() as Map<String, dynamic>;
+                  return _ServiceCard(
+                    title: service['name'],
+                    price: service['price'],
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => BookingScreen(
+                          serviceName: service['name'],
+                          price: service['price'],
+                        )),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
 
-// 🎨 تصميم الكارت (مربع بأيقونة ملونة)
+// بطاقة الخدمة
 class _ServiceCard extends StatelessWidget {
   final String title;
-  final IconData icon;
-  final Color color;
+  final int price;
   final VoidCallback onTap;
 
-  const _ServiceCard({required this.title, required this.icon, required this.color, required this.onTap});
+  const _ServiceCard({required this.title, required this.price, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -116,19 +187,20 @@ class _ServiceCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, spreadRadius: 5)],
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5, spreadRadius: 2)],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(icon, size: 40, color: color),
+              decoration: BoxDecoration(color: Colors.teal.withOpacity(0.1), shape: BoxShape.circle),
+              child: const Icon(Icons.medical_services, size: 30, color: Colors.teal),
             ),
-            const SizedBox(height: 15),
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text("$price دج", style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -136,10 +208,12 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 
-// 📝 صفحة الحجز (الاستمارة التي تربط بفايربيز)
+// 📝 شاشة الحجز (المحدثة)
 class BookingScreen extends StatefulWidget {
   final String serviceName;
-  const BookingScreen({super.key, required this.serviceName});
+  final int price;
+
+  const BookingScreen({super.key, required this.serviceName, required this.price});
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -147,122 +221,122 @@ class BookingScreen extends StatefulWidget {
 
 class _BookingScreenState extends State<BookingScreen> {
   final _formKey = GlobalKey<FormState>();
-  // المتغيرات لحفظ ما يكتبه المستخدم
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _detailsController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _detailsController = TextEditingController();
+  
   bool _isLoading = false;
+  String? _location;
+  bool _hasImage = false;
 
-  // 🔥 دالة الإرسال إلى فايربيز
-  Future<void> _submitRequest() async {
-    if (!_formKey.currentState!.validate()) return;
-
+  Future<void> _getLocation() async {
     setState(() => _isLoading = true);
-
     try {
-      // 1. معرفة من هو المستخدم الحالي
-      User? user = FirebaseAuth.instance.currentUser;
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
       
-      // 2. تجهيز الطرد (البيانات)
-      Map<String, dynamic> requestData = {
-        "service": widget.serviceName,
-        "patient_name": _nameController.text,
-        "phone": _phoneController.text,
-        "address": _addressController.text,
-        "details": _detailsController.text,
-        "status": "pending", // الحالة الافتراضية: قيد الانتظار
-        "user_id": user?.uid ?? "anonymous", // هوية المستخدم
-        "created_at": FieldValue.serverTimestamp(), // وقت الطلب
-      };
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      setState(() => _location = "${position.latitude}, ${position.longitude}");
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تعذر تحديد الموقع")));
+    }
+    setState(() => _isLoading = false);
+  }
 
-      // 3. الإرسال الفعلي لقاعدة البيانات
-      await FirebaseFirestore.instance.collection('requests').add(requestData);
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    
+    setState(() => _isLoading = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser!;
+      
+      // جلب بيانات المستخدم لمعرفة الولاية
+      var userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      String wilaya = userDoc.exists ? (userDoc['wilaya'] ?? "غير محدد") : "غير محدد";
 
-      // 4. رسالة النجاح
+      await FirebaseFirestore.instance.collection('requests').add({
+        'user_id': user.uid,
+        'patient_name': _nameController.text,
+        'phone': _phoneController.text,
+        'details': _detailsController.text,
+        'service': widget.serviceName,
+        'price': widget.price,
+        'location': _location ?? "لم يحدد الموقع", // يفضل GPS
+        'wilaya': wilaya, // مهم للفلترة عند الممرض
+        'status': 'pending',
+        'has_image': _hasImage,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(children: [Icon(Icons.check, color: Colors.white), SizedBox(width: 10), Text("تم إرسال طلبك بنجاح! سيتصل بك الممرض.")]),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Navigator.pop(context); // الرجوع للصفحة الرئيسية
+        Navigator.pop(context); // العودة للصفحة الرئيسية لرؤية الرادار
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم إرسال الطلب!")));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ حدث خطأ: $e"), backgroundColor: Colors.red),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e")));
     }
-
     setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("حجز ${widget.serviceName}"),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: Text("حجز ${widget.serviceName}"), backgroundColor: Colors.teal),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("املأ البيانات ليصلك الممرض", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
+              Text("السعر التقديري: ${widget.price} دج", style: const TextStyle(fontSize: 20, color: Colors.green, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: "اسم المريض", border: OutlineInputBorder()), validator: (v) => v!.isEmpty ? "مطلوب" : null),
+              const SizedBox(height: 15),
+              TextFormField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "رقم الهاتف", border: OutlineInputBorder()), validator: (v) => v!.isEmpty ? "مطلوب" : null),
+              const SizedBox(height: 15),
+              TextFormField(controller: _detailsController, maxLines: 3, decoration: const InputDecoration(labelText: "تفاصيل الحالة", border: OutlineInputBorder())),
               const SizedBox(height: 20),
               
-              _buildTextField("الاسم الكامل", _nameController, icon: Icons.person),
-              _buildTextField("رقم الهاتف", _phoneController, icon: Icons.phone, isNumber: true),
-              _buildTextField("العنوان (الولاية/البلدية)", _addressController, icon: Icons.location_on),
-              _buildTextField("تفاصيل (مثلاً: حقنة، تغيير ضمادة...)", _detailsController, icon: Icons.note, maxLines: 3),
-
+              // أزرار المرفقات
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                         final ImagePicker picker = ImagePicker();
+                         if (await picker.pickImage(source: ImageSource.camera) != null) {
+                           setState(() => _hasImage = true);
+                         }
+                      },
+                      icon: Icon(_hasImage ? Icons.check : Icons.camera_alt),
+                      label: Text(_hasImage ? "تم التصوير" : "صورة (اختياري)"),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _getLocation,
+                      icon: const Icon(Icons.location_on),
+                      label: Text(_location == null ? "موقعي" : "تم التحديد"),
+                      style: ElevatedButton.styleFrom(backgroundColor: _location == null ? Colors.blue : Colors.green),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 30),
               
               SizedBox(
                 width: double.infinity,
-                height: 55,
+                height: 50,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submitRequest,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: _isLoading 
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("تأكيد الطلب", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  onPressed: _isLoading ? null : _submit,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                  child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text("تأكيد وحجز", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // دالة مساعدة لرسم الخانات بشكل جميل
-  Widget _buildTextField(String label, TextEditingController controller, {IconData? icon, bool isNumber = false, int maxLines = 1}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: isNumber ? TextInputType.phone : TextInputType.text,
-        maxLines: maxLines,
-        validator: (value) => value!.isEmpty ? "هذا الحقل مطلوب" : null,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: icon != null ? Icon(icon, color: Colors.teal) : null,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          filled: true,
-          fillColor: Colors.white,
         ),
       ),
     );
