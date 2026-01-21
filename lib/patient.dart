@@ -11,6 +11,8 @@ class PatientHome extends StatelessWidget {
       appBar: AppBar(
         title: const Text("عافية - خدمات طبية"),
         centerTitle: true,
+        backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.exit_to_app),
@@ -25,7 +27,7 @@ class PatientHome extends StatelessWidget {
           padding: const EdgeInsets.all(20.0),
           child: Column(
             children: [
-              // 🟢 بطاقة الترحيب
+              // 🟢 بطاقة الترحيب (نفس تصميمك)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -51,7 +53,7 @@ class PatientHome extends StatelessWidget {
                 crossAxisSpacing: 15,
                 mainAxisSpacing: 15,
                 children: [
-                  // 👇 هذا الزر الوحيد المفعل حالياً
+                  // 👇 زر ممرض منزلي (مفعل وينقلك للاستمارة)
                   _ServiceCard(
                     title: "ممرض منزلي",
                     icon: Icons.medical_services_outlined,
@@ -63,6 +65,7 @@ class PatientHome extends StatelessWidget {
                       );
                     },
                   ),
+                  // بقية الخدمات (ستظهر رسالة "قريباً")
                   _ServiceCard(
                     title: "طبيب عام",
                     icon: Icons.person,
@@ -97,7 +100,7 @@ class PatientHome extends StatelessWidget {
   }
 }
 
-// 🎨 تصميم الكارت
+// 🎨 تصميم الكارت (مربع بأيقونة ملونة)
 class _ServiceCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -125,7 +128,7 @@ class _ServiceCard extends StatelessWidget {
               child: Icon(icon, size: 40, color: color),
             ),
             const SizedBox(height: 15),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -133,7 +136,7 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 
-// 📝 صفحة الحجز (الاستمارة)
+// 📝 صفحة الحجز (الاستمارة التي تربط بفايربيز)
 class BookingScreen extends StatefulWidget {
   final String serviceName;
   const BookingScreen({super.key, required this.serviceName});
@@ -144,42 +147,48 @@ class BookingScreen extends StatefulWidget {
 
 class _BookingScreenState extends State<BookingScreen> {
   final _formKey = GlobalKey<FormState>();
+  // المتغيرات لحفظ ما يكتبه المستخدم
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _detailsController = TextEditingController();
   bool _isLoading = false;
 
+  // 🔥 دالة الإرسال إلى فايربيز
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      // 1. الحصول على هوية المستخدم الحالي
+      // 1. معرفة من هو المستخدم الحالي
       User? user = FirebaseAuth.instance.currentUser;
       
-      // 2. تجهيز البيانات
+      // 2. تجهيز الطرد (البيانات)
       Map<String, dynamic> requestData = {
         "service": widget.serviceName,
         "patient_name": _nameController.text,
         "phone": _phoneController.text,
         "address": _addressController.text,
         "details": _detailsController.text,
-        "status": "pending", // الحالة: قيد الانتظار
-        "user_id": user?.uid ?? "anonymous",
-        "created_at": FieldValue.serverTimestamp(),
+        "status": "pending", // الحالة الافتراضية: قيد الانتظار
+        "user_id": user?.uid ?? "anonymous", // هوية المستخدم
+        "created_at": FieldValue.serverTimestamp(), // وقت الطلب
       };
 
-      // 3. الحفظ في فايربيز (Firestore)
+      // 3. الإرسال الفعلي لقاعدة البيانات
       await FirebaseFirestore.instance.collection('requests').add(requestData);
 
-      // 4. نجاح العملية
+      // 4. رسالة النجاح
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("✅ تم إرسال طلبك بنجاح! سيتصل بك الممرض قريباً."), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Row(children: [Icon(Icons.check, color: Colors.white), SizedBox(width: 10), Text("تم إرسال طلبك بنجاح! سيتصل بك الممرض.")]),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
-        Navigator.pop(context); // العودة للصفحة الرئيسية
+        Navigator.pop(context); // الرجوع للصفحة الرئيسية
       }
     } catch (e) {
       if (mounted) {
@@ -195,7 +204,11 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("حجز ${widget.serviceName}")),
+      appBar: AppBar(
+        title: Text("حجز ${widget.serviceName}"),
+        backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(
@@ -220,11 +233,12 @@ class _BookingScreenState extends State<BookingScreen> {
                   onPressed: _isLoading ? null : _submitRequest,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   child: _isLoading 
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("تأكيد الطلب", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                    : const Text("تأكيد الطلب", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -234,6 +248,7 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  // دالة مساعدة لرسم الخانات بشكل جميل
   Widget _buildTextField(String label, TextEditingController controller, {IconData? icon, bool isNumber = false, int maxLines = 1}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
