@@ -1,4 +1,4 @@
-import 'dart:convert'; // 👈 ضروري
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -206,7 +206,6 @@ class _StaffManagementTab extends StatelessWidget {
     );
   }
 
-  // 🖼️ دالة فك التشفير وعرض الصورة
   Widget _decodeImage(String? base64String) {
     if (base64String == null) return Container(height: 100, color: Colors.grey, child: const Center(child: Text("لا توجد صورة")));
     try {
@@ -227,7 +226,6 @@ class _RequestsTab extends StatelessWidget {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snapshot.data!.docs;
-
         if (docs.isEmpty) return const Center(child: Text("لا توجد طلبات حالياً"));
 
         return ListView.builder(
@@ -262,7 +260,6 @@ class _RequestsTab extends StatelessWidget {
 
 class _ServicesTab extends StatefulWidget {
   const _ServicesTab();
-
   @override
   State<_ServicesTab> createState() => _ServicesTabState();
 }
@@ -273,13 +270,11 @@ class _ServicesTabState extends State<_ServicesTab> {
 
   void _addService() {
     if (_nameController.text.isEmpty || _priceController.text.isEmpty) return;
-    
     FirebaseFirestore.instance.collection('services').add({
       'name': _nameController.text,
       'price': int.tryParse(_priceController.text) ?? 0,
       'active': true,
     });
-    
     _nameController.clear();
     _priceController.clear();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تمت إضافة الخدمة")));
@@ -293,14 +288,14 @@ class _ServicesTabState extends State<_ServicesTab> {
           padding: const EdgeInsets.all(15.0),
           child: Row(
             children: [
-              Expanded(child: TextField(controller: _nameController, decoration: const InputDecoration(labelText: "اسم الخدمة (مثلاً: حقنة)"))),
+              Expanded(child: TextField(controller: _nameController, decoration: const InputDecoration(labelText: "اسم الخدمة"))),
               const SizedBox(width: 10),
-              Expanded(child: TextField(controller: _priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "السعر (دج)"))),
-              IconButton(icon: const Icon(Icons.add_circle, color: Colors.teal, size: 40), onPressed: _addService),
+              Expanded(child: TextField(controller: _priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "السعر"))),
+              IconButton(icon: const Icon(Icons.add_circle, color: Colors.teal), onPressed: _addService),
             ],
           ),
         ),
-        const Divider(thickness: 2),
+        const Divider(),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('services').snapshots(),
@@ -312,11 +307,8 @@ class _ServicesTabState extends State<_ServicesTab> {
                   var data = snapshot.data!.docs[index];
                   return ListTile(
                     title: Text(data['name']),
-                    trailing: Text("${data['price']} دج", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-                    leading: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => data.reference.delete(),
-                    ),
+                    trailing: Text("${data['price']} دج"),
+                    leading: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => data.reference.delete()),
                   );
                 },
               );
