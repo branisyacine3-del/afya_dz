@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:afya_dz/screens/login_screen.dart';
+import 'login_screen.dart'; // ✅ صحيح
 
 class PatientHome extends StatelessWidget {
   const PatientHome({super.key});
@@ -28,30 +28,26 @@ class PatientHome extends StatelessWidget {
           ),
         ],
       ),
-      // فحص: هل لدى المريض طلب نشط حالياً؟
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('requests')
             .where('user_id', isEqualTo: user!.uid)
-            .where('status', whereIn: ['pending', 'accepted', 'on_way']) // الحالات النشطة
+            .where('status', whereIn: ['pending', 'accepted', 'on_way'])
             .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           
-          // 1️⃣ إذا كان هناك طلب نشط -> اعرض شاشة التتبع (الرادار)
           if (snapshot.data!.docs.isNotEmpty) {
             var request = snapshot.data!.docs.first;
             return _buildTrackingScreen(request);
           }
 
-          // 2️⃣ إذا لم يكن هناك طلب -> اعرض قائمة الخدمات
           return _buildServicesList(context, user);
         },
       ),
     );
   }
 
-  // 📡 شاشة التتبع (الرادار)
   Widget _buildTrackingScreen(DocumentSnapshot request) {
     var data = request.data() as Map<String, dynamic>;
     String status = data['status'];
@@ -76,7 +72,6 @@ class PatientHome extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // محاكاة الرادار
             Stack(
               alignment: Alignment.center,
               children: [
@@ -91,7 +86,6 @@ class PatientHome extends StatelessWidget {
             Text("الخدمة: ${data['service']} (${data['price']} دج)", style: const TextStyle(fontSize: 16, color: Colors.grey)),
             const SizedBox(height: 40),
             
-            // زر إلغاء الطلب (فقط إذا كان قيد الانتظار)
             if (status == 'pending')
               OutlinedButton.icon(
                 onPressed: () {
@@ -109,11 +103,9 @@ class PatientHome extends StatelessWidget {
     );
   }
 
-  // 🏥 قائمة الخدمات (من الفايربيز)
   Widget _buildServicesList(BuildContext context, User user) {
     return Column(
       children: [
-        // بانر ترحيبي
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(20),
@@ -126,7 +118,6 @@ class PatientHome extends StatelessWidget {
           ),
         ),
         
-        // الشبكة
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('services').where('active', isEqualTo: true).snapshots(),
@@ -172,7 +163,6 @@ class PatientHome extends StatelessWidget {
   }
 }
 
-// بطاقة الخدمة
 class _ServiceCard extends StatelessWidget {
   final String title;
   final int price;
@@ -208,7 +198,6 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 
-// 📝 شاشة الحجز (المحدثة)
 class BookingScreen extends StatefulWidget {
   final String serviceName;
   final int price;
@@ -250,7 +239,6 @@ class _BookingScreenState extends State<BookingScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser!;
       
-      // جلب بيانات المستخدم لمعرفة الولاية
       var userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       String wilaya = userDoc.exists ? (userDoc['wilaya'] ?? "غير محدد") : "غير محدد";
 
@@ -261,15 +249,15 @@ class _BookingScreenState extends State<BookingScreen> {
         'details': _detailsController.text,
         'service': widget.serviceName,
         'price': widget.price,
-        'location': _location ?? "لم يحدد الموقع", // يفضل GPS
-        'wilaya': wilaya, // مهم للفلترة عند الممرض
+        'location': _location ?? "لم يحدد الموقع",
+        'wilaya': wilaya,
         'status': 'pending',
         'has_image': _hasImage,
         'created_at': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
-        Navigator.pop(context); // العودة للصفحة الرئيسية لرؤية الرادار
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم إرسال الطلب!")));
       }
     } catch (e) {
@@ -297,7 +285,6 @@ class _BookingScreenState extends State<BookingScreen> {
               TextFormField(controller: _detailsController, maxLines: 3, decoration: const InputDecoration(labelText: "تفاصيل الحالة", border: OutlineInputBorder())),
               const SizedBox(height: 20),
               
-              // أزرار المرفقات
               Row(
                 children: [
                   Expanded(
