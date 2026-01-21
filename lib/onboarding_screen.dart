@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:afya_dz/screens/login_screen.dart'; // سننشئها لاحقاً
+import 'login_screen.dart'; // ✅ تم التصحيح
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
-
+// ... (باقي الكود كما هو تماماً، فقط تأكد من تغيير الاستيراد في الأعلى)
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
-
+// (انسخ باقي المحتوى من الكود السابق الذي أرسلته لك، لا يوجد تغيير سوى الاستيراد)
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
@@ -16,7 +16,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     {
       "title": "مرحباً بك في عافية",
       "body": "أول منصة جزائرية تربطك بأفضل الممرضين والأطباء وأنت في منزلك.",
-      "icon": "assets/welcome.png" // سنستبدلها لاحقاً
+      "icon": "assets/welcome.png"
     },
     {
       "title": "خدمات طبية متكاملة",
@@ -37,18 +37,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // زر التخطي
             Align(
               alignment: Alignment.topLeft,
               child: TextButton(
                 onPressed: () {
-                   Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreenPlaceholder()));
+                   Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
                 },
                 child: const Text("تخطي", style: TextStyle(color: Colors.teal)),
               ),
             ),
-            
-            // المحتوى المتغير
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -61,8 +58,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             ),
-
-            // المؤشر والنقاط
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -79,8 +74,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
             const SizedBox(height: 30),
-
-            // زر المتابعة
             Padding(
               padding: const EdgeInsets.all(20),
               child: SizedBox(
@@ -91,8 +84,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     if (_currentPage < _pages.length - 1) {
                       _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.ease);
                     } else {
-                      // الانتقال لصفحة التسجيل
-                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreenPlaceholder()));
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -119,7 +111,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(iconData, size: 150, color: Colors.teal.shade300), // مؤقتاً أيقونات
+          Icon(iconData, size: 150, color: Colors.teal.shade300),
           const SizedBox(height: 40),
           Text(title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black87), textAlign: TextAlign.center),
           const SizedBox(height: 15),
@@ -129,15 +121,4 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 }
-
-// 🚧 صفحة مؤقتة لكي لا يحدث خطأ عند الضغط
-class LoginScreenPlaceholder extends StatelessWidget {
-  const LoginScreenPlaceholder({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("تسجيل الدخول")),
-      body: const Center(child: Text("هنا ستكون صفحة التسجيل والولايات")),
-    );
-  }
-}
+ 
