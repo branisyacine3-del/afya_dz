@@ -20,15 +20,14 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Clean Build Setup
+    - name: Clean Build Setup & Fix Kotlin
       run: |
-        # 1. تنظيف وإنشاء المشروع من جديد
+        # 1. تنظيف وإنشاء المشروع
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 2. 🔥 الحل الجذري: كتابة ملف build.gradle جديد تماماً يحتوي على النسخة الصحيحة
-        # هذا الأمر سيحذف الملف القديم ويكتب واحداً جديداً بـ Kotlin 1.9.0
-        cat > android/build.gradle <<'EOF'
+        # 2. 🔥 الحل الجذري: كتابة ملف build.gradle الرئيسي بنسخة Kotlin 1.9.0
+        cat > android/build.gradle <<EOF
         buildscript {
             ext.kotlin_version = '1.9.0'
             repositories {
@@ -37,7 +36,7 @@ jobs:
             }
             dependencies {
                 classpath 'com.android.tools.build:gradle:7.3.0'
-                classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+                classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:\$kotlin_version"
             }
         }
         allprojects {
@@ -48,7 +47,7 @@ jobs:
         }
         rootProject.buildDir = '../build'
         subprojects {
-            project.buildDir = "${rootProject.buildDir}/${project.name}"
+            project.buildDir = "\${rootProject.buildDir}/\${project.name}"
         }
         subprojects {
             project.evaluationDependsOn(':app')
@@ -58,10 +57,24 @@ jobs:
         }
         EOF
 
-        # 3. إضافة أذونات الإنترنت والموقع والكاميرا
-        sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+        # 3. 🔥 تعديل settings.gradle (مهم جداً لحل مشكلة التوافق)
+        # سنحذف طريقة الإضافات الجديدة التي تسبب التعارض ونستخدم الطريقة الكلاسيكية
+        cat > android/settings.gradle <<EOF
+        include ':app'
         
-        # 4. رفع الحد الأدنى للإصدار (MinSDK)
+        def localPropertiesFile = new File(rootProject.projectDir, "local.properties")
+        def properties = new Properties()
+        
+        assert localPropertiesFile.exists()
+        localPropertiesFile.withReader("UTF-8") { reader -> properties.load(reader) }
+        
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        apply from: "\$flutterSdkPath/packages/flutter_tools/gradle/app_plugin_loader.gradle"
+        EOF
+
+        # 4. الأذونات و MinSDK
+        sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
     - name: Get dependencies
