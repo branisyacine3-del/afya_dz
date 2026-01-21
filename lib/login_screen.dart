@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:afya_dz/screens/signup_screen.dart'; // لفتح صفحة التسجيل
-import 'package:afya_dz/patient.dart'; // صفحة المريض
-import 'package:afya_dz/admin.dart';   // صفحة المدير
-// import 'package:afya_dz/provider.dart'; // سننشئها لاحقاً للممرض
+import 'signup_screen.dart'; // ✅ صحيح
+import 'patient.dart';       // ✅ صحيح
+import 'admin.dart';         // ✅ صحيح
+import 'provider.dart';      // ✅ صحيح
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -35,7 +35,6 @@ class _LoginScreenState extends State<LoginScreen> {
       
       if (userDoc.exists) {
         String role = userDoc['role'];
-        // String status = userDoc['status']; // سنحتاجها لاحقاً لفحص حالة الممرض
 
         if (mounted) {
            if (role == 'admin') {
@@ -45,18 +44,14 @@ class _LoginScreenState extends State<LoginScreen> {
              // 👤 توجيه المريض
              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PatientHome()));
            } else if (role == 'provider') {
-             // 🚑 توجيه الممرض (مؤقتاً نعرض رسالة حتى نبرمج لوحته)
-             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("أهلاً بك يا شريك العافية! (جاري تجهيز لوحتك)")));
-             import 'package:afya_dz/provider.dart'; // لا تنسى الإستيراد في الأعلى
-...
-Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProviderGate()));
-
+             // 🚑 توجيه الممرض
+             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProviderGate()));
            }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ خطأ في الدخول: تأكد من البيانات")));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("❌ خطأ في الدخول: تأكد من البيانات")));
       }
     }
     
@@ -145,3 +140,4 @@ Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const
     );
   }
 }
+ 
