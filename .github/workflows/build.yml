@@ -22,18 +22,18 @@ jobs:
 
     - name: Clean Build Setup
       run: |
-        # 1. تنظيف كامل وإنشاء مشروع جديد خالٍ من إضافات فايربيز المعقدة
+        # 1. تنظيف وإنشاء المشروع من جديد
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 2. إضافة إذن الإنترنت فقط (ضروري للاتصال)
-        sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+        # 2. 🔥 التحديث السحري: إجبار المشروع على استخدام Kotlin 1.9.0 لتتوافق مع المكتبات
+        sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.0"/' android/build.gradle
         
-        # 3. رفع الحد الأدنى للإصدار ليعمل مع المكتبات الحديثة
+        # 3. إضافة أذونات الإنترنت والموقع والكاميرا
+        sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+        
+        # 4. رفع الحد الأدنى للإصدار (MinSDK) ليعمل مع المكتبات الحديثة
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
-        
-        # ملاحظة: لن نقوم بحقن "google-services plugin" هنا أبداً
-        # لأننا نستخدم التهيئة اليدوية في main.dart
 
     - name: Get dependencies
       run: flutter pub get
@@ -44,5 +44,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: afya-web-config
+        name: afya-app-final
         path: build/app/outputs/flutter-apk/app-release.apk
