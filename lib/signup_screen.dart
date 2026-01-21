@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:afya_dz/screens/login_screen.dart'; // سننشئها الخطوة القادمة
-import 'package:afya_dz/patient.dart'; // الصفحة الرئيسية للمريض
+import 'login_screen.dart'; // ✅ صحيح
+import 'patient.dart';      // ✅ صحيح
+// import 'provider.dart'; // يمكن إضافته لاحقاً إذا احتجنا توجيه مباشر
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -15,8 +16,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   
-  // 🎭 نوع الحساب: هل هو مريض أم شريك؟
-  bool _isProvider = false; // false = مريض, true = شريك (عائلة عافية)
+  // 🎭 نوع الحساب
+  bool _isProvider = false; 
 
   // 📝 البيانات
   final TextEditingController _nameController = TextEditingController();
@@ -24,11 +25,10 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   
-  // 📍 القوائم المنسدلة
+  // 📍 القوائم
   String? _selectedWilaya;
   String? _selectedSpecialty;
 
-  // 🇩🇿 قائمة الـ 58 ولاية (ثابتة)
   final List<String> _wilayas = [
     "01. أدرار", "02. الشلف", "03. الأغواط", "04. أم البواقي", "05. باتنة", "06. بجاية",
     "07. بسكرة", "08. بشار", "09. البليدة", "10. البويرة", "11. تمنراست", "12. تبسة",
@@ -42,7 +42,6 @@ class _SignupScreenState extends State<SignupScreen> {
     "54. عين قزام", "55. تقرت", "56. جانت", "57. المغير", "58. المنيعة"
   ];
 
-  // 🩺 التخصصات (تظهر فقط للشركاء)
   final List<String> _specialties = ["ممرض منزلي", "طبيب عام", "سائق إسعاف", "نقل صحي"];
 
   Future<void> _register() async {
@@ -59,39 +58,32 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. إنشاء الحساب في Authentication
       UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // 2. تحديد الدور والحالة
       String role = _isProvider ? 'provider' : 'patient';
-      // المريض مفعل فوراً، الشريك معلق (pending)
       String status = _isProvider ? 'pending_docs' : 'active'; 
 
-      // 3. حفظ البيانات في Firestore
       await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
         'uid': userCredential.user!.uid,
         'full_name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
         'email': _emailController.text.trim(),
         'wilaya': _selectedWilaya,
-        'role': role, // patient OR provider
-        'status': status, // active OR pending_docs
-        'specialty': _isProvider ? _selectedSpecialty : null, // فقط للشركاء
+        'role': role,
+        'status': status,
+        'specialty': _isProvider ? _selectedSpecialty : null,
         'created_at': FieldValue.serverTimestamp(),
-        'subscription_expiry': null, // سيتم تفعيله لاحقاً للشركاء
+        'subscription_expiry': null,
       });
 
       if (mounted) {
-        // التوجيه حسب الدور
         if (_isProvider) {
-          // الشريك يذهب لصفحة رفع الوثائق (سننشئها لاحقاً)
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم إنشاء الحساب! يرجى تجهيز وثائقك.")));
-          // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const VerificationScreen())); 
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم إنشاء الحساب! يرجى تسجيل الدخول لتجهيز وثائقك.")));
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen())); 
         } else {
-          // المريض يدخل مباشرة
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PatientHome()));
         }
       }
@@ -114,13 +106,11 @@ class _SignupScreenState extends State<SignupScreen> {
             key: _formKey,
             child: Column(
               children: [
-                // 🟢 الشعار
                 const Icon(Icons.security, size: 60, color: Colors.teal),
                 const SizedBox(height: 10),
                 const Text("انضم لعائلة عافية", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
                 const SizedBox(height: 30),
 
-                // 🔘 زر التبديل (مريض / شريك)
                 Container(
                   padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(30)),
@@ -133,7 +123,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // 📝 الخانات الأساسية
                 _buildTextField("الاسم الكامل", _nameController, Icons.person),
                 const SizedBox(height: 15),
                 _buildTextField("رقم الهاتف", _phoneController, Icons.phone, isPhone: true),
@@ -143,7 +132,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 _buildTextField("كلمة المرور", _passwordController, Icons.lock, isPassword: true),
                 const SizedBox(height: 15),
 
-                // 📍 قائمة الولايات
                 DropdownButtonFormField<String>(
                   decoration: InputDecoration(
                     labelText: "الولاية (إلزامي)",
@@ -159,7 +147,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 15),
 
-                // 🩺 قائمة التخصصات (تظهر فقط إذا اخترت شريك)
                 if (_isProvider) ...[
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
@@ -182,7 +169,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   const SizedBox(height: 15),
                 ],
 
-                // 🚀 زر التسجيل
                 SizedBox(
                   width: double.infinity,
                   height: 55,
@@ -201,7 +187,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 const SizedBox(height: 20),
                 TextButton(
                   onPressed: () {
-                     Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+                     Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
                   },
                   child: const Text("لديك حساب بالفعل؟ سجل الدخول", style: TextStyle(color: Colors.teal)),
                 ),
@@ -213,7 +199,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // تصميم زر التبديل
   Widget _buildToggleButton(String text, bool isSelected) {
     return Expanded(
       child: GestureDetector(
@@ -254,3 +239,4 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 }
+ 
