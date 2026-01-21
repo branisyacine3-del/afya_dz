@@ -26,13 +26,42 @@ jobs:
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 2. 🔥 التحديث السحري: إجبار المشروع على استخدام Kotlin 1.9.0 لتتوافق مع المكتبات
-        sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.0"/' android/build.gradle
-        
+        # 2. 🔥 الحل الجذري: كتابة ملف build.gradle جديد تماماً يحتوي على النسخة الصحيحة
+        # هذا الأمر سيحذف الملف القديم ويكتب واحداً جديداً بـ Kotlin 1.9.0
+        cat > android/build.gradle <<'EOF'
+        buildscript {
+            ext.kotlin_version = '1.9.0'
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:7.3.0'
+                classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+            }
+        }
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        rootProject.buildDir = '../build'
+        subprojects {
+            project.buildDir = "${rootProject.buildDir}/${project.name}"
+        }
+        subprojects {
+            project.evaluationDependsOn(':app')
+        }
+        tasks.register("clean", Delete) {
+            delete rootProject.buildDir
+        }
+        EOF
+
         # 3. إضافة أذونات الإنترنت والموقع والكاميرا
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # 4. رفع الحد الأدنى للإصدار (MinSDK) ليعمل مع المكتبات الحديثة
+        # 4. رفع الحد الأدنى للإصدار (MinSDK)
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
     - name: Get dependencies
@@ -46,3 +75,4 @@ jobs:
       with:
         name: afya-app-final
         path: build/app/outputs/flutter-apk/app-release.apk
+ 
