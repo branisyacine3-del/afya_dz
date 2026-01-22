@@ -1,4 +1,4 @@
-import 'dart:convert'; // 👈 ضرورية لتحويل الصورة
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -217,8 +217,28 @@ class _BookingScreenState extends State<BookingScreen> {
   final _detailsController = TextEditingController();
   
   bool _isLoading = false;
-  String? _location;
-  String? _base64Image; // 👈 المتغير الجديد للصورة المشفرة
+  String? _location; // "36.75, 3.05"
+  String? _base64Image;
+
+  // 1️⃣ هذه الدالة تسحب البيانات تلقائياً عند فتح الشاشة
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData();
+  }
+
+  Future<void> _fetchUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      var doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _nameController.text = doc['full_name'] ?? "";
+          _phoneController.text = doc['phone'] ?? "";
+        });
+      }
+    }
+  }
 
   Future<void> _getLocation() async {
     setState(() => _isLoading = true);
@@ -229,15 +249,13 @@ class _BookingScreenState extends State<BookingScreen> {
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       setState(() => _location = "${position.latitude}, ${position.longitude}");
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تعذر تحديد الموقع")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تعذر تحديد الموقع، يرجى تفعيل GPS")));
     }
     setState(() => _isLoading = false);
   }
 
-  // 📸 دالة تحويل الصورة إلى نص
   Future<void> _pickAndConvertImage() async {
     final ImagePicker picker = ImagePicker();
-    // imageQuality: 50 مهم جداً لتقليل الحجم
     final XFile? image = await picker.pickImage(source: ImageSource.camera, imageQuality: 50);
     
     if (image != null) {
@@ -254,10 +272,18 @@ class _BookingScreenState extends State<BookingScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     
+    // 2️⃣ شرط الموقع الإجباري
+    if (_location == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("📍 الموقع مطلوب! يرجى الضغط على زر تحديد الموقع."),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+    
     setState(() => _isLoading = true);
     try {
       final user = FirebaseAuth.instance.currentUser!;
-      
       var userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       String wilaya = userDoc.exists ? (userDoc['wilaya'] ?? "غير محدد") : "غير محدد";
 
@@ -268,10 +294,10 @@ class _BookingScreenState extends State<BookingScreen> {
         'details': _detailsController.text,
         'service': widget.serviceName,
         'price': widget.price,
-        'location': _location ?? "لم يحدد الموقع",
+        'location': _location, // لن يكون null أبداً بسبب الشرط
         'wilaya': wilaya,
         'status': 'pending',
-        'image_data': _base64Image, // 👈 إرسال كود الصورة
+        'image_data': _base64Image,
         'created_at': FieldValue.serverTimestamp(),
       });
 
@@ -297,18 +323,34 @@ class _BookingScreenState extends State<BookingScreen> {
             children: [
               Text("السعر التقديري: ${widget.price} دج", style: const TextStyle(fontSize: 20, color: Colors.green, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
-              TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: "اسم المريض", border: OutlineInputBorder()), validator: (v) => v!.isEmpty ? "مطلوب" : null),
+              
+              TextFormField(
+                controller: _nameController, // مملوء تلقائياً
+                decoration: const InputDecoration(labelText: "اسم المريض", border: OutlineInputBorder()), 
+                validator: (v) => v!.isEmpty ? "مطلوب" : null
+              ),
               const SizedBox(height: 15),
-              TextFormField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "رقم الهاتف", border: OutlineInputBorder()), validator: (v) => v!.isEmpty ? "مطلوب" : null),
+              
+              TextFormField(
+                controller: _phoneController, // مملوء تلقائياً
+                keyboardType: TextInputType.phone, 
+                decoration: const InputDecoration(labelText: "رقم الهاتف", border: OutlineInputBorder()), 
+                validator: (v) => v!.isEmpty ? "مطلوب" : null
+              ),
               const SizedBox(height: 15),
-              TextFormField(controller: _detailsController, maxLines: 3, decoration: const InputDecoration(labelText: "تفاصيل الحالة", border: OutlineInputBorder())),
+              
+              TextFormField(
+                controller: _detailsController, 
+                maxLines: 3, 
+                decoration: const InputDecoration(labelText: "تفاصيل الحالة", border: OutlineInputBorder())
+              ),
               const SizedBox(height: 20),
               
               Row(
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: _pickAndConvertImage, // 👈 استدعاء الدالة الجديدة
+                      onPressed: _pickAndConvertImage,
                       icon: Icon(_base64Image != null ? Icons.check : Icons.camera_alt),
                       label: Text(_base64Image != null ? "تم التصوير" : "صورة (اختياري)"),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
@@ -319,8 +361,9 @@ class _BookingScreenState extends State<BookingScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _getLocation,
                       icon: const Icon(Icons.location_on),
-                      label: Text(_location == null ? "موقعي" : "تم التحديد"),
-                      style: ElevatedButton.styleFrom(backgroundColor: _location == null ? Colors.blue : Colors.green),
+                      // تغيير اللون والنص حسب الحالة
+                      label: Text(_location == null ? "تحديد الموقع *" : "تم التحديد ✅"),
+                      style: ElevatedButton.styleFrom(backgroundColor: _location == null ? Colors.red : Colors.green),
                     ),
                   ),
                 ],
@@ -343,4 +386,3 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 }
- 
