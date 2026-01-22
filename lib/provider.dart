@@ -3,8 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:image_picker/image_picker.dart'; // ✅ هذا السطر هو الحل
+import 'package:image_picker/image_picker.dart';
 
+// 🚦 البوابة الذكية للممرض
 class ProviderGate extends StatelessWidget {
   const ProviderGate({super.key});
 
@@ -22,6 +23,7 @@ class ProviderGate extends StatelessWidget {
         var data = snapshot.data!.data() as Map<String, dynamic>;
         String status = data['status'] ?? 'pending_docs';
 
+        // توجيه حسب الحالة
         if (status == 'pending_docs') return const VerificationScreen();
         
         if (status == 'under_review') return const StatusScreen(
@@ -40,7 +42,7 @@ class ProviderGate extends StatelessWidget {
           color: Colors.blue,
         );
 
-        if (status == 'active') return const ProviderDashboard();
+        if (status == 'active') return const ProviderDashboard(); // 👈 هنا لوحة العمل الحقيقية
 
         return const StatusScreen(
           title: "عذراً",
@@ -53,6 +55,9 @@ class ProviderGate extends StatelessWidget {
   }
 }
 
+// -----------------------------------------------------------------------------
+// 1️⃣ شاشة رفع الوثائق (مع ضغط الصور)
+// -----------------------------------------------------------------------------
 class VerificationScreen extends StatefulWidget {
   const VerificationScreen({super.key});
 
@@ -68,6 +73,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   Future<void> _pickAndConvert(String type) async {
     final ImagePicker picker = ImagePicker();
+    // ضغط الصورة مهم جداً (الجودة 40%)
     final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 40);
     
     if (image != null) {
@@ -143,6 +149,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
   }
 }
 
+// -----------------------------------------------------------------------------
+// 2️⃣ شاشة الدفع
+// -----------------------------------------------------------------------------
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
 
@@ -224,6 +233,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 }
 
+// -----------------------------------------------------------------------------
+// 3️⃣ لوحة العمل (الرادار الحقيقي) 🚨
+// -----------------------------------------------------------------------------
 class ProviderDashboard extends StatefulWidget {
   const ProviderDashboard({super.key});
 
@@ -233,6 +245,7 @@ class ProviderDashboard extends StatefulWidget {
 
 class _ProviderDashboardState extends State<ProviderDashboard> {
   bool _isAvailable = true;
+  final String _myUid = FirebaseAuth.instance.currentUser!.uid;
 
   @override
   Widget build(BuildContext context) {
@@ -247,13 +260,14 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
       ),
       body: Column(
         children: [
+          // 🟢 زر التواجد (أونلاين / أوفلاين)
           Container(
             color: _isAvailable ? Colors.teal[50] : Colors.grey[200],
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(_isAvailable ? "🟢 أنت متصل" : "🔴 أنت غير متصل", style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(_isAvailable ? "🟢 أنت متصل (تتلقى طلبات)" : "🔴 أنت غير متصل", style: const TextStyle(fontWeight: FontWeight.bold)),
                 Switch(
                   value: _isAvailable,
                   activeColor: Colors.teal,
@@ -262,17 +276,115 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
               ],
             ),
           ),
+          
+          // 📡 الرادار: البحث عن الطلبات
           Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.map, size: 80, color: Colors.grey[300]),
-                  const SizedBox(height: 10),
-                  const Text("جاري البحث عن طلبات...", style: TextStyle(color: Colors.grey)),
-                ],
+            child: _isAvailable 
+            ? StreamBuilder<DocumentSnapshot>(
+                // 1. نجلب بيانات الممرض لنعرف ولايته
+                stream: FirebaseFirestore.instance.collection('users').doc(_myUid).snapshots(),
+                builder: (context, userSnapshot) {
+                  if (!userSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  
+                  String myWilaya = userSnapshot.data!['wilaya'] ?? "";
+
+                  return StreamBuilder<QuerySnapshot>(
+                    // 2. نبحث عن الطلبات: (الحالة = انتظار) + (الولاية = ولايتي)
+                    stream: FirebaseFirestore.instance.collection('requests')
+                        .where('status', isEqualTo: 'pending')
+                        .where('wilaya', isEqualTo: myWilaya) 
+                        .snapshots(),
+                    builder: (context, requestSnapshot) {
+                      if (!requestSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+                      var docs = requestSnapshot.data!.docs;
+
+                      if (docs.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.radar, size: 80, color: Colors.grey[300]),
+                              const SizedBox(height: 20),
+                              Text("لا توجد طلبات في ولاية ($myWilaya) حالياً", style: const TextStyle(color: Colors.grey)),
+                              const SizedBox(height: 5),
+                              const Text("جاري البحث...", style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        );
+                      }
+
+                      // 🔔 وجدنا طلبات! اعرضها
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(15),
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          var req = docs[index].data() as Map<String, dynamic>;
+                          var reqId = docs[index].id;
+
+                          return Card(
+                            elevation: 5,
+                            margin: const EdgeInsets.only(bottom: 20),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text("🔥 طلب جديد!", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                                      Text("${req['price']} دج", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
+                                    ],
+                                  ),
+                                  const Divider(),
+                                  ListTile(
+                                    leading: const CircleAvatar(backgroundColor: Colors.teal, child: Icon(Icons.person, color: Colors.white)),
+                                    title: Text(req['patient_name'] ?? "مريض"),
+                                    subtitle: Text(req['service'] ?? "خدمة"),
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.location_on, color: Colors.red),
+                                    title: Text(req['location'] ?? "الموقع"),
+                                    subtitle: Text("المسافة: قريب منك"), 
+                                  ),
+                                  const SizedBox(height: 15),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        // ✅ قبول الطلب: تغيير الحالة وربط الممرض
+                                        FirebaseFirestore.instance.collection('requests').doc(reqId).update({
+                                          'status': 'accepted',
+                                          'provider_id': _myUid,
+                                        });
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم قبول الطلب! توجه للمريض 🚑")));
+                                      },
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                                      child: const Text("قبول الطلب", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                    ),
+                                  )
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                }
+              )
+            : Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.power_off, size: 80, color: Colors.grey),
+                    const SizedBox(height: 10),
+                    const Text("أنت غير متصل", style: TextStyle(fontSize: 18, color: Colors.grey)),
+                    TextButton(onPressed: () => setState(() => _isAvailable = true), child: const Text("اضغط للاتصال"))
+                  ],
+                ),
               ),
-            ),
           ),
         ],
       ),
@@ -280,6 +392,9 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
   }
 }
 
+// -----------------------------------------------------------------------------
+// 4️⃣ شاشات الحالة المساعدة
+// -----------------------------------------------------------------------------
 class StatusScreen extends StatelessWidget {
   final String title;
   final String message;
@@ -312,4 +427,3 @@ class StatusScreen extends StatelessWidget {
     );
   }
 }
- 
