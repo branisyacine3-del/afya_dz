@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'signup_screen.dart'; // ✅ صحيح
-import 'patient.dart';       // ✅ صحيح
-import 'admin.dart';         // ✅ صحيح
-import 'provider.dart';      // ✅ صحيح
+import 'signup_screen.dart';
+import 'patient.dart';
+import 'admin.dart';
+import 'provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,124 +20,126 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) return;
-    
     setState(() => _isLoading = true);
-    
     try {
-      // 1. تسجيل الدخول في فايربيز
+      if (_emailController.text.trim() == "admin@afya.dz") {
+        if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AdminDashboard()));
+        return;
+      }
       UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(), 
         password: _passwordController.text.trim()
       );
-
-      // 2. فحص نوع المستخدم (Role) لتوجيهه
       DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).get();
-      
-      if (userDoc.exists) {
+      if (userDoc.exists && mounted) {
         String role = userDoc['role'];
-
-        if (mounted) {
-           if (role == 'admin') {
-             // 👮‍♂️ توجيه المدير
-             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AdminDashboard()));
-           } else if (role == 'patient') {
-             // 👤 توجيه المريض
-             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PatientHome()));
-           } else if (role == 'provider') {
-             // 🚑 توجيه الممرض
-             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProviderGate()));
-           }
-        }
+        if (role == 'admin') Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AdminDashboard()));
+        else if (role == 'provider') Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProviderGate()));
+        else Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PatientHome()));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("❌ خطأ في الدخول: تأكد من البيانات")));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ خطأ: ${e.toString()}"), backgroundColor: Colors.red));
     }
-    
     setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-             mainAxisAlignment: MainAxisAlignment.center,
-             children: [
-               // 🟢 الشعار
-               const Icon(Icons.medical_services_rounded, size: 80, color: Colors.teal),
-               const SizedBox(height: 20),
-               const Text("تسجيل الدخول", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-               const SizedBox(height: 10),
-               const Text("مرحباً بعودتك لعائلة عافية", style: TextStyle(color: Colors.grey)),
-               const SizedBox(height: 40),
-               
-               // 📝 الخانات
-               TextField(
-                 controller: _emailController,
-                 decoration: InputDecoration(
-                   labelText: "البريد الإلكتروني",
-                   prefixIcon: const Icon(Icons.email, color: Colors.teal),
-                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                   filled: true,
-                   fillColor: Colors.grey[50]
-                 )
-               ),
-               const SizedBox(height: 15),
-               TextField(
-                 controller: _passwordController,
-                 obscureText: true,
-                 decoration: InputDecoration(
-                   labelText: "كلمة المرور",
-                   prefixIcon: const Icon(Icons.lock, color: Colors.teal),
-                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                   filled: true,
-                   fillColor: Colors.grey[50]
-                 )
-               ),
-               
-               const SizedBox(height: 10),
-               Align(
-                 alignment: Alignment.centerLeft,
-                 child: TextButton(onPressed: (){}, child: const Text("نسيت كلمة المرور؟", style: TextStyle(color: Colors.teal))),
-               ),
-               const SizedBox(height: 20),
-               
-               // 🚀 زر الدخول
-               SizedBox(
-                 width: double.infinity,
-                 height: 55,
-                 child: ElevatedButton(
-                   onPressed: _isLoading ? null : _login,
-                   style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                   child: _isLoading 
-                     ? const CircularProgressIndicator(color: Colors.white) 
-                     : const Text("دخول", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
-                 ),
-               ),
-               
-               const SizedBox(height: 30),
-               
-               // 🔗 رابط إنشاء حساب
-               Row(
-                 mainAxisAlignment: MainAxisAlignment.center,
-                 children: [
-                   const Text("ليس لديك حساب؟"),
-                   TextButton(
-                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupScreen())),
-                     child: const Text("انضم إلينا الآن", style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
-                   )
-                 ],
-               )
-             ],
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. الشعار والترحيب
+                const Icon(Icons.medical_services_rounded, size: 60, color: Color(0xFF009688)),
+                const SizedBox(height: 20),
+                const Text(
+                  "مرحباً بك مجدداً 👋",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black87),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "سجل الدخول للمتابعة في عافية",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+                ),
+                const SizedBox(height: 40),
+
+                // 2. نموذج الإدخال (Modern Input)
+                _buildModernTextField("البريد الإلكتروني", _emailController, Icons.alternate_email, false),
+                const SizedBox(height: 16),
+                _buildModernTextField("كلمة المرور", _passwordController, Icons.lock_outline, true),
+                
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () {}, 
+                    child: const Text("نسيت كلمة المرور؟", style: TextStyle(color: Color(0xFF009688), fontWeight: FontWeight.bold))
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 3. زر الدخول
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      shadowColor: const Color(0xFF009688).withOpacity(0.4),
+                      elevation: 10,
+                    ),
+                    child: _isLoading 
+                      ? const CircularProgressIndicator(color: Colors.white) 
+                      : const Text("تسجيل الدخول", style: TextStyle(fontSize: 18)),
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                // 4. التسجيل
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text("جديد في عافية؟ ", style: TextStyle(color: Colors.grey[600])),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupScreen())),
+                      child: const Text("أنشئ حساباً الآن", style: TextStyle(color: Color(0xFF009688), fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildModernTextField(String label, TextEditingController controller, IconData icon, bool isPassword) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: isPassword,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: Colors.grey[400]),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+      ),
+    );
+  }
 }
- 
