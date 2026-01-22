@@ -22,19 +22,18 @@ jobs:
 
     - name: Clean Build Setup & Fix Kotlin
       run: |
-        # 1. تنظيف وإنشاء المشروع بطريقة Flutter الرسمية
+        # 1. إنشاء المشروع
         rm -rf android
         flutter create . --org com.yacine --project-name afya_dz --platform android
         
-        # 2. 🔥 التعديل الجراحي: البحث عن نسخة Kotlin القديمة واستبدالها بـ 1.9.0
-        # هذا الأمر يبحث داخل settings.gradle الذي أنشأه فلاتر ويقوم بالتحديث
+        # 2. إصلاح نسخة Kotlin
         sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.0"/' android/settings.gradle
 
         # 3. تحديث MinSDK
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
 
-        # 4. إضافة الأذونات المطلوبة (الإنترنت، الموقع، الكاميرا)
-        sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+        # 4. 🔥 السطر السحري: إضافة أذونات الاتصال (tel) والخرائط (geo) والإنترنت
+        sed -i 's/<application/<queries><intent><action android:name="android.intent.action.VIEW" \/><data android:scheme="https" \/><\/intent><intent><action android:name="android.intent.action.DIAL" \/><data android:scheme="tel" \/><\/intent><intent><action android:name="android.intent.action.VIEW" \/><data android:scheme="geo" \/><\/intent><\/queries><uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
 
     - name: Get dependencies
       run: flutter pub get
@@ -47,4 +46,3 @@ jobs:
       with:
         name: afya-app-final
         path: build/app/outputs/flutter-apk/app-release.apk
- 
