@@ -1,4 +1,4 @@
-import 'dart:async'; // للإصلاحات الزمنية
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -23,7 +23,7 @@ class _PatientHomeState extends State<PatientHome> {
   int _currentIndex = 0;
   
   final List<Widget> _pages = [
-    const _HomeTab(),      // 1. الرئيسية (الأقسام + الخدمات)
+    const _HomeTab(),      // 1. الرئيسية
     const _MyRequestsTab(), // 2. طلباتي
     const _SettingsTab(),   // 3. الإعدادات
   ];
@@ -79,7 +79,6 @@ class _HomeTabState extends State<_HomeTab> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // زر العودة يظهر فقط إذا اخترنا قسماً
         leading: _selectedCategory != null 
             ? IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => setState(() => _selectedCategory = null))
             : null,
@@ -108,7 +107,6 @@ class _HomeTabState extends State<_HomeTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // إذا لم يتم اختيار قسم، نعرض الأقسام الثلاثة
             if (_selectedCategory == null) ...[
               // 📢 البانر الإعلاني
               _GlassCard(
@@ -142,15 +140,14 @@ class _HomeTabState extends State<_HomeTab> {
                 ],
               ),
               const SizedBox(height: 15),
-              _CategoryCard("سائق إسعاف", "driver", Icons.ambulance, Colors.orange, () => setState(() => _selectedCategory = 'driver')),
+              // ✅ تم التصحيح: استبدال Icons.ambulance بـ Icons.directions_car
+              _CategoryCard("سائق إسعاف", "driver", Icons.directions_car, Colors.orange, () => setState(() => _selectedCategory = 'driver')),
             
             ] else ...[
-              // إذا تم اختيار قسم، نعرض الخدمات التابعة له فقط
               StreamBuilder<QuerySnapshot>(
-                // سنقوم بتصفية الخدمات حسب حقل 'type' الذي سنضيفه في الأدمن
                 stream: FirebaseFirestore.instance.collection('services')
                     .where('active', isEqualTo: true)
-                    .where('type', isEqualTo: _selectedCategory) // 👈 الفلترة هنا
+                    .where('type', isEqualTo: _selectedCategory)
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) return const Center(child: Text("حدث خطأ في تحميل الخدمات"));
@@ -190,7 +187,7 @@ class _HomeTabState extends State<_HomeTab> {
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => BookingScreen(
                           serviceName: service['name'], 
                           price: service['price'],
-                          categoryType: _selectedCategory!, // نمرر النوع للطلب
+                          categoryType: _selectedCategory!,
                         ))),
                       );
                     },
@@ -306,7 +303,6 @@ class _MyRequestsTab extends StatelessWidget {
                           const Icon(Icons.attach_money, color: Colors.teal, size: 20),
                           Text("${data['price']} دج"),
                           const Spacer(),
-                          // زر الإلغاء (فقط إذا لم يقبل بعد)
                           if (status == 'pending')
                             TextButton(
                               onPressed: () => docs[index].reference.delete(),
@@ -401,12 +397,12 @@ class _SettingsTabState extends State<_SettingsTab> {
 }
 
 // -----------------------------------------------------------------------------
-// 📅 شاشة الحجز (تم إصلاح مشكلة التعليق والدوران)
+// 📅 شاشة الحجز
 // -----------------------------------------------------------------------------
 class BookingScreen extends StatefulWidget {
   final String serviceName;
   final int price;
-  final String categoryType; // نوع الخدمة (ممرض/طبيب/سائق)
+  final String categoryType;
 
   const BookingScreen({super.key, required this.serviceName, required this.price, required this.categoryType});
 
@@ -442,24 +438,18 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  // 🔥 إصلاح: إضافة timeout للموقع لكي لا يعلق التطبيق
   Future<void> _getLocation() async {
     setState(() => _isLoading = true);
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw "تم رفض إذن الموقع";
-        }
+        if (permission == LocationPermission.denied) throw "تم رفض إذن الموقع";
       }
-      
-      // ننتظر 5 ثواني كحد أقصى للحصول على الموقع
       Position pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high).timeout(const Duration(seconds: 5));
       setState(() => _location = "${pos.latitude}, ${pos.longitude}");
     } catch (e) {
-      // إذا فشل الـ GPS، نعرض رسالة خطأ واضحة
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("تعذر تحديد الموقع تلقائياً: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("تعذر تحديد الموقع: $e")));
     }
     setState(() => _isLoading = false);
   }
@@ -475,7 +465,7 @@ class _BookingScreenState extends State<BookingScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_location == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("📍 الموقع إجباري! اضغط على زر تحديد الموقع"), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("📍 الموقع إجباري!"), backgroundColor: Colors.red));
       return;
     }
 
@@ -491,7 +481,7 @@ class _BookingScreenState extends State<BookingScreen> {
         'details': _detailsController.text,
         'service': widget.serviceName,
         'price': widget.price,
-        'type': widget.categoryType, // 👈 حفظ النوع (nurse/doctor/driver)
+        'type': widget.categoryType,
         'location': _location,
         'wilaya': doc['wilaya'] ?? 'غير محدد',
         'status': 'pending',
@@ -583,7 +573,7 @@ class _BookingScreenState extends State<BookingScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// 🔔 شاشة الإشعارات الحقيقية
+// 🔔 شاشة الإشعارات
 // -----------------------------------------------------------------------------
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -593,7 +583,6 @@ class NotificationsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("الإشعارات"), backgroundColor: Colors.white, elevation: 0),
       body: StreamBuilder<QuerySnapshot>(
-        // 🔥 ربط مباشر مع مجموعة notifications
         stream: FirebaseFirestore.instance.collection('notifications').orderBy('created_at', descending: true).limit(20).snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
