@@ -1,3 +1,4 @@
+import 'dart:async'; // للإصلاحات الزمنية
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -6,10 +7,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'auth_screens.dart'; // للعودة عند تسجيل الخروج
+import 'auth_screens.dart'; // للعودة
 
 // -----------------------------------------------------------------------------
-// 🏠 الواجهة الرئيسية للمريض (Bottom Nav)
+// 🏠 الواجهة الرئيسية للمريض
 // -----------------------------------------------------------------------------
 class PatientHome extends StatefulWidget {
   const PatientHome({super.key});
@@ -20,8 +21,9 @@ class PatientHome extends StatefulWidget {
 
 class _PatientHomeState extends State<PatientHome> {
   int _currentIndex = 0;
+  
   final List<Widget> _pages = [
-    const _HomeTab(),      // 1. الرئيسية
+    const _HomeTab(),      // 1. الرئيسية (الأقسام + الخدمات)
     const _MyRequestsTab(), // 2. طلباتي
     const _SettingsTab(),   // 3. الإعدادات
   ];
@@ -56,10 +58,17 @@ class _PatientHomeState extends State<PatientHome> {
 }
 
 // -----------------------------------------------------------------------------
-// 1️⃣ التبويب الأول: الرئيسية (الخدمات والعروض)
+// 1️⃣ التبويب الأول: الرئيسية (الأقسام والخدمات المفلترة)
 // -----------------------------------------------------------------------------
-class _HomeTab extends StatelessWidget {
+class _HomeTab extends StatefulWidget {
   const _HomeTab();
+
+  @override
+  State<_HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<_HomeTab> {
+  String? _selectedCategory; // لتحديد القسم (nurse, doctor, driver)
 
   @override
   Widget build(BuildContext context) {
@@ -70,21 +79,24 @@ class _HomeTab extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        // زر العودة يظهر فقط إذا اخترنا قسماً
+        leading: _selectedCategory != null 
+            ? IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => setState(() => _selectedCategory = null))
+            : null,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text("مرحباً، ${user?.email?.split('@')[0] ?? 'زائر'}", style: const TextStyle(fontSize: 14, color: Colors.grey)),
-            const Text("بماذا تشعر اليوم؟", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
+            Text(_selectedCategory == null ? "اختر نوع الخدمة" : _getCategoryName(_selectedCategory!), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
           ],
         ),
         actions: [
-          // 🔔 زر الإشعارات
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: CircleAvatar(
               backgroundColor: Colors.white,
               child: IconButton(
-                icon: const Icon(Icons.notifications_none, color: Color(0xFF009688)),
+                icon: const Icon(Icons.notifications_active_outlined, color: Color(0xFF009688)),
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationsScreen())),
               ),
             ),
@@ -96,66 +108,139 @@ class _HomeTab extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 📢 البانر الإعلاني (يأتي من الأدمن لاحقاً، حالياً ثابت كمثال)
-            _GlassCard(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF009688), Color(0xFF4DB6AC)]),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("🎉 عروض 50%", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 5),
-                    Text("بمناسبة إطلاق التطبيق للشهر الأول!", style: TextStyle(color: Colors.white70)),
-                  ],
+            // إذا لم يتم اختيار قسم، نعرض الأقسام الثلاثة
+            if (_selectedCategory == null) ...[
+              // 📢 البانر الإعلاني
+              _GlassCard(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF009688), Color(0xFF4DB6AC)]),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("🎉 عروض حصرية", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                      SizedBox(height: 5),
+                      Text("تخفيضات على الحقن المنزلية هذا الأسبوع!", style: TextStyle(color: Colors.white70)),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 25),
+              const SizedBox(height: 25),
+              
+              const Text("الأقسام الطبية", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              
+              Row(
+                children: [
+                  _CategoryCard("ممرض منزلي", "nurse", Icons.medical_services, Colors.teal, () => setState(() => _selectedCategory = 'nurse')),
+                  const SizedBox(width: 15),
+                  _CategoryCard("طبيب", "doctor", Icons.local_hospital, Colors.blue, () => setState(() => _selectedCategory = 'doctor')),
+                ],
+              ),
+              const SizedBox(height: 15),
+              _CategoryCard("سائق إسعاف", "driver", Icons.ambulance, Colors.orange, () => setState(() => _selectedCategory = 'driver')),
             
-            const Text("الخدمات المتاحة", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 15),
+            ] else ...[
+              // إذا تم اختيار قسم، نعرض الخدمات التابعة له فقط
+              StreamBuilder<QuerySnapshot>(
+                // سنقوم بتصفية الخدمات حسب حقل 'type' الذي سنضيفه في الأدمن
+                stream: FirebaseFirestore.instance.collection('services')
+                    .where('active', isEqualTo: true)
+                    .where('type', isEqualTo: _selectedCategory) // 👈 الفلترة هنا
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) return const Center(child: Text("حدث خطأ في تحميل الخدمات"));
+                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  
+                  var services = snapshot.data!.docs;
 
-            // 🏥 شبكة الخدمات (تأتي من الفايربيز)
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('services').where('active', isEqualTo: true).snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                var services = snapshot.data!.docs;
-
-                if (services.isEmpty) {
-                  return const Center(child: Padding(padding: EdgeInsets.all(20), child: Text("لا توجد خدمات متاحة حالياً")));
-                }
-
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 15,
-                    mainAxisSpacing: 15,
-                    childAspectRatio: 0.9,
-                  ),
-                  itemCount: services.length,
-                  itemBuilder: (context, index) {
-                    var service = services[index].data() as Map<String, dynamic>;
-                    return _ServiceItem(
-                      title: service['name'],
-                      price: service['price'],
-                      // منطق بسيط للأيقونات حسب الاسم
-                      icon: service['name'].toString().contains("طبيب") ? Icons.local_hospital : 
-                            service['name'].toString().contains("سائق") ? Icons.directions_car : Icons.medical_services,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => BookingScreen(serviceName: service['name'], price: service['price']))),
+                  if (services.isEmpty) {
+                    return Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.search_off, size: 60, color: Colors.grey[300]),
+                          const SizedBox(height: 20),
+                          const Text("لا توجد خدمات في هذا القسم حالياً", style: TextStyle(color: Colors.grey)),
+                          const Text("سيقوم المدير بإضافتها قريباً", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
                     );
-                  },
-                );
-              },
-            ),
+                  }
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 15,
+                      mainAxisSpacing: 15,
+                      childAspectRatio: 0.9,
+                    ),
+                    itemCount: services.length,
+                    itemBuilder: (context, index) {
+                      var service = services[index].data() as Map<String, dynamic>;
+                      return _ServiceItem(
+                        title: service['name'],
+                        price: service['price'],
+                        icon: _getCategoryIcon(_selectedCategory!),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => BookingScreen(
+                          serviceName: service['name'], 
+                          price: service['price'],
+                          categoryType: _selectedCategory!, // نمرر النوع للطلب
+                        ))),
+                      );
+                    },
+                  );
+                },
+              ),
+            ]
           ],
+        ),
+      ),
+    );
+  }
+
+  String _getCategoryName(String type) {
+    if (type == 'nurse') return "تمريض منزلي";
+    if (type == 'doctor') return "أطباء";
+    if (type == 'driver') return "نقل صحي";
+    return "";
+  }
+  
+  IconData _getCategoryIcon(String type) {
+    if (type == 'nurse') return Icons.medical_services;
+    if (type == 'doctor') return Icons.person;
+    if (type == 'driver') return Icons.directions_car;
+    return Icons.help;
+  }
+
+  Widget _CategoryCard(String title, String type, IconData icon, Color color, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 120,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5))],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+                child: Icon(icon, size: 30, color: color),
+              ),
+              const SizedBox(height: 10),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
         ),
       ),
     );
@@ -163,7 +248,7 @@ class _HomeTab extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// 2️⃣ التبويب الثاني: طلباتي (التتبع المباشر)
+// 2️⃣ التبويب الثاني: طلباتي
 // -----------------------------------------------------------------------------
 class _MyRequestsTab extends StatelessWidget {
   const _MyRequestsTab();
@@ -183,9 +268,7 @@ class _MyRequestsTab extends StatelessWidget {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           var docs = snapshot.data!.docs;
 
-          if (docs.isEmpty) {
-            return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history, size: 80, color: Colors.grey[300]), const Text("لا يوجد سجل طلبات")]));
-          }
+          if (docs.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history, size: 80, color: Colors.grey[300]), const Text("لا يوجد سجل طلبات")]));
 
           return ListView.builder(
             padding: const EdgeInsets.all(15),
@@ -194,13 +277,11 @@ class _MyRequestsTab extends StatelessWidget {
               var data = docs[index].data() as Map<String, dynamic>;
               String status = data['status'];
               
-              // تحديد لون وحالة البطاقة
               Color statusColor = Colors.orange;
               String statusText = "جاري البحث...";
-              if (status == 'accepted') { statusColor = Colors.blue; statusText = "تم القبول! يجهز نفسه"; }
-              if (status == 'on_way') { statusColor = Colors.green; statusText = "الممرض في الطريق 🚑"; }
-              if (status == 'completed') { statusColor = Colors.grey; statusText = "مكتملة ✅"; }
-              if (status == 'rejected') { statusColor = Colors.red; statusText = "ملغاة ❌"; }
+              if (status == 'accepted') { statusColor = Colors.blue; statusText = "تم القبول"; }
+              if (status == 'on_way') { statusColor = Colors.green; statusText = "في الطريق"; }
+              if (status == 'completed') { statusColor = Colors.grey; statusText = "مكتملة"; }
 
               return _GlassCard(
                 margin: const EdgeInsets.only(bottom: 15),
@@ -225,46 +306,14 @@ class _MyRequestsTab extends StatelessWidget {
                           const Icon(Icons.attach_money, color: Colors.teal, size: 20),
                           Text("${data['price']} دج"),
                           const Spacer(),
-                          Text(data['created_at'] != null ? "منذ قليل" : "", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          // زر الإلغاء (فقط إذا لم يقبل بعد)
+                          if (status == 'pending')
+                            TextButton(
+                              onPressed: () => docs[index].reference.delete(),
+                              child: const Text("إلغاء", style: TextStyle(color: Colors.red)),
+                            )
                         ],
                       ),
-                      
-                      // أزرار التحكم (للحالات النشطة فقط)
-                      if (status == 'pending') ...[
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () => docs[index].reference.delete(),
-                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                            child: const Text("إلغاء الطلب"),
-                          ),
-                        )
-                      ],
-
-                      if (status == 'accepted' || status == 'on_way') ...[
-                        const SizedBox(height: 15),
-                        // هنا نأتي بمعلومات الممرض (في المستقبل يمكن ربطها بجدول users)
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(10)),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.support_agent, color: Colors.blue),
-                              const SizedBox(width: 10),
-                              const Expanded(child: Text("الممرض قبل طلبك!", style: TextStyle(fontWeight: FontWeight.bold))),
-                              // زر الاتصال بالممرض (إذا توفر رقمه - سنضيفه لاحقاً في الـ update)
-                              IconButton(
-                                icon: const Icon(Icons.phone, color: Colors.green),
-                                onPressed: () {
-                                  // يمكننا إضافة حقل phone_provider في الطلب عند القبول
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("سيتم تفعيل الاتصال قريباً")));
-                                }, 
-                              )
-                            ],
-                          ),
-                        ),
-                      ]
                     ],
                   ),
                 ),
@@ -278,7 +327,7 @@ class _MyRequestsTab extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// 3️⃣ التبويب الثالث: الإعدادات (الملف الشخصي)
+// 3️⃣ التبويب الثالث: الإعدادات
 // -----------------------------------------------------------------------------
 class _SettingsTab extends StatefulWidget {
   const _SettingsTab();
@@ -288,8 +337,7 @@ class _SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<_SettingsTab> {
   final _nameController = TextEditingController();
-  bool _isDark = false;
-
+  
   @override
   void initState() {
     super.initState();
@@ -301,17 +349,6 @@ class _SettingsTabState extends State<_SettingsTab> {
     if(mounted && doc.exists) setState(() => _nameController.text = doc['full_name']);
   }
 
-  void _updateName() async {
-    if(_nameController.text.isEmpty) return;
-    await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({'full_name': _nameController.text});
-    if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم تحديث الاسم")));
-  }
-
-  void _contactSupport() async {
-    final Uri url = Uri.parse("https://wa.me/213562898252"); // رقم الدعم
-    if (!await launchUrl(url)) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تعذر فتح واتساب")));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -320,68 +357,42 @@ class _SettingsTabState extends State<_SettingsTab> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // صورة البروفايل (أول حرف)
             CircleAvatar(
               radius: 40,
               backgroundColor: const Color(0xFF009688),
-              child: Text(_nameController.text.isNotEmpty ? _nameController.text[0].toUpperCase() : "A", style: const TextStyle(fontSize: 30, color: Colors.white)),
+              child: Text(_nameController.text.isNotEmpty ? _nameController.text[0].toUpperCase() : "U", style: const TextStyle(fontSize: 30, color: Colors.white)),
             ),
             const SizedBox(height: 20),
             
-            // تعديل الاسم
             _GlassCard(
               child: ListTile(
                 leading: const Icon(Icons.person),
-                title: TextField(controller: _nameController, decoration: const InputDecoration(border: InputBorder.none, hintText: "اسمك الكامل")),
-                trailing: IconButton(icon: const Icon(Icons.save, color: Colors.teal), onPressed: _updateName),
+                title: Text(_nameController.text, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text("المريض"),
               ),
             ),
             const SizedBox(height: 10),
 
-            // باقي الإعدادات
             _GlassCard(
               child: Column(
                 children: [
-                  SwitchListTile(
-                    title: const Text("الوضع المظلم"),
-                    secondary: const Icon(Icons.dark_mode),
-                    value: _isDark,
-                    activeColor: const Color(0xFF009688),
-                    onChanged: (val) => setState(() => _isDark = val),
+                  ListTile(
+                    leading: const Icon(Icons.support_agent, color: Colors.green),
+                    title: const Text("تواصل مع الدعم"),
+                    onTap: () => launchUrl(Uri.parse("https://wa.me/213562898252")),
                   ),
                   const Divider(),
                   ListTile(
-                    leading: const Icon(Icons.language),
-                    title: const Text("اللغة"),
-                    trailing: const Text("العربية", style: TextStyle(color: Colors.grey)),
-                    onTap: () {},
+                    leading: const Icon(Icons.logout, color: Colors.red),
+                    title: const Text("تسجيل الخروج"),
+                    onTap: () async {
+                      await FirebaseAuth.instance.signOut();
+                      if(context.mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+                    },
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-
-            // زر الدعم
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _contactSupport,
-                icon: const Icon(Icons.support_agent),
-                label: const Text("تواصل مع الدعم (WhatsApp)"),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // تسجيل الخروج
-            TextButton(
-              onPressed: () async {
-                await FirebaseAuth.instance.signOut();
-                if(mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
-              },
-              child: const Text("تسجيل الخروج", style: TextStyle(color: Colors.red)),
-            )
           ],
         ),
       ),
@@ -390,12 +401,14 @@ class _SettingsTabState extends State<_SettingsTab> {
 }
 
 // -----------------------------------------------------------------------------
-// 📅 شاشة الحجز الذكي (Booking Screen)
+// 📅 شاشة الحجز (تم إصلاح مشكلة التعليق والدوران)
 // -----------------------------------------------------------------------------
 class BookingScreen extends StatefulWidget {
   final String serviceName;
   final int price;
-  const BookingScreen({super.key, required this.serviceName, required this.price});
+  final String categoryType; // نوع الخدمة (ممرض/طبيب/سائق)
+
+  const BookingScreen({super.key, required this.serviceName, required this.price, required this.categoryType});
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -429,21 +442,30 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
+  // 🔥 إصلاح: إضافة timeout للموقع لكي لا يعلق التطبيق
   Future<void> _getLocation() async {
     setState(() => _isLoading = true);
     try {
       LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
-      Position pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw "تم رفض إذن الموقع";
+        }
+      }
+      
+      // ننتظر 5 ثواني كحد أقصى للحصول على الموقع
+      Position pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high).timeout(const Duration(seconds: 5));
       setState(() => _location = "${pos.latitude}, ${pos.longitude}");
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى تفعيل GPS")));
+      // إذا فشل الـ GPS، نعرض رسالة خطأ واضحة
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("تعذر تحديد الموقع تلقائياً: $e")));
     }
     setState(() => _isLoading = false);
   }
 
   Future<void> _getImage() async {
-    final file = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 40);
+    final file = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 30);
     if (file != null) {
       String base64 = base64Encode(await File(file.path).readAsBytes());
       setState(() => _base64Image = base64);
@@ -453,7 +475,7 @@ class _BookingScreenState extends State<BookingScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_location == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("📍 الموقع إجباري لتسهيل الوصول إليك"), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("📍 الموقع إجباري! اضغط على زر تحديد الموقع"), backgroundColor: Colors.red));
       return;
     }
 
@@ -469,6 +491,7 @@ class _BookingScreenState extends State<BookingScreen> {
         'details': _detailsController.text,
         'service': widget.serviceName,
         'price': widget.price,
+        'type': widget.categoryType, // 👈 حفظ النوع (nurse/doctor/driver)
         'location': _location,
         'wilaya': doc['wilaya'] ?? 'غير محدد',
         'status': 'pending',
@@ -478,10 +501,14 @@ class _BookingScreenState extends State<BookingScreen> {
 
       if(mounted) {
         Navigator.pop(context);
-        showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text("تم بنجاح!"), content: const Text("طلبك قيد البحث عن أقرب ممرض."), actions: [TextButton(onPressed: ()=>Navigator.pop(ctx), child: const Text("حسناً"))]));
+        showDialog(context: context, builder: (ctx) => AlertDialog(
+          title: const Text("تم إرسال الطلب!"), 
+          content: const Text("طلبك قيد البحث عن أقرب مقدم خدمة."), 
+          actions: [TextButton(onPressed: ()=>Navigator.pop(ctx), child: const Text("حسناً"))]
+        ));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("حدث خطأ: $e")));
     }
     setState(() => _isLoading = false);
   }
@@ -496,7 +523,6 @@ class _BookingScreenState extends State<BookingScreen> {
           key: _formKey,
           child: Column(
             children: [
-              // الفاتورة الزجاجية
               _GlassCard(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -524,7 +550,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _getImage,
                       icon: Icon(_base64Image == null ? Icons.camera_alt : Icons.check),
-                      label: Text(_base64Image == null ? "صورة (وصفة/جرح)" : "تمت الإضافة"),
+                      label: Text(_base64Image == null ? "صورة (اختياري)" : "تم"),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
                     ),
                   ),
@@ -533,7 +559,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _getLocation,
                       icon: const Icon(Icons.location_on),
-                      label: Text(_location == null ? "تحديد موقعي *" : "تم التحديد ✅"),
+                      label: Text(_location == null ? "الموقع *" : "تم ✅"),
                       style: ElevatedButton.styleFrom(backgroundColor: _location == null ? Colors.red : Colors.green),
                     ),
                   ),
@@ -557,7 +583,7 @@ class _BookingScreenState extends State<BookingScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// 🔔 شاشة الإشعارات (Notifications)
+// 🔔 شاشة الإشعارات الحقيقية
 // -----------------------------------------------------------------------------
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -567,11 +593,12 @@ class NotificationsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("الإشعارات"), backgroundColor: Colors.white, elevation: 0),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('notifications').orderBy('created_at', descending: true).snapshots(),
+        // 🔥 ربط مباشر مع مجموعة notifications
+        stream: FirebaseFirestore.instance.collection('notifications').orderBy('created_at', descending: true).limit(20).snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           var docs = snapshot.data!.docs;
-          if (docs.isEmpty) return const Center(child: Text("لا توجد إشعارات"));
+          if (docs.isEmpty) return const Center(child: Text("لا توجد إشعارات جديدة"));
 
           return ListView.builder(
             padding: const EdgeInsets.all(15),
@@ -613,14 +640,11 @@ class NotificationsScreen extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 🎨 أدوات التصميم (Glass UI Components)
-// -----------------------------------------------------------------------------
+// أدوات التصميم
 class _GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? margin;
   const _GlassCard({required this.child, this.margin});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -637,13 +661,8 @@ class _GlassCard extends StatelessWidget {
 }
 
 class _ServiceItem extends StatelessWidget {
-  final String title;
-  final int price;
-  final IconData icon;
-  final VoidCallback onTap;
-
+  final String title; final int price; final IconData icon; final VoidCallback onTap;
   const _ServiceItem({required this.title, required this.price, required this.icon, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
