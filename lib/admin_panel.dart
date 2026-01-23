@@ -61,6 +61,7 @@ class _JoinRequestsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("مراجعة الوثائق")),
       body: StreamBuilder<QuerySnapshot>(
+        // حذفنا orderBy لتسريع التحميل وحل مشكلة الدوران
         stream: FirebaseFirestore.instance.collection('users').where('status', isEqualTo: 'under_review').snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
@@ -77,7 +78,7 @@ class _JoinRequestsScreen extends StatelessWidget {
                 child: ExpansionTile(
                   leading: CircleAvatar(backgroundImage: data['personal_image'] != null ? MemoryImage(base64Decode(data['personal_image'])) : null),
                   title: Text(data['full_name']),
-                  subtitle: Text("${data['specialty']} - ${data['wilaya']}"),
+                  subtitle: Text("${data['specialty'] ?? 'غير محدد'} - ${data['wilaya'] ?? ''}"),
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(10),
@@ -143,16 +144,17 @@ class _PaymentReviewScreen extends StatelessWidget {
           if (docs.isEmpty) return const Center(child: Text("لا توجد مدفوعات للمراجعة"));
 
           return ListView.builder(
+            padding: const EdgeInsets.all(10),
             itemCount: docs.length,
             itemBuilder: (context, index) {
               var data = docs[index].data() as Map<String, dynamic>;
               return Card(
                 child: Column(
                   children: [
-                    ListTile(title: Text(data['full_name']), subtitle: Text(data['phone'])),
+                    ListTile(title: Text(data['full_name']), subtitle: Text(data['phone'] ?? "")),
                     SizedBox(
                       height: 200,
-                      child: _ZoomableImage(data['receipt_image'], "وصل الدفع"),
+                      child: _ZoomableImage(data['receipt_image'], "وصل الدفع - اضغط للتكبير"),
                     ),
                     Padding(
                       padding: const EdgeInsets.all(10),
@@ -194,36 +196,43 @@ class _ActiveStaffScreen extends StatelessWidget {
         stream: FirebaseFirestore.instance.collection('users').where('status', isEqualTo: 'active').snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (snapshot.data!.docs.isEmpty) return const Center(child: Text("لا يوجد طاقم نشط حالياً"));
           
           return ListView.builder(
+            padding: const EdgeInsets.all(10),
             itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
               var data = snapshot.data!.docs[index].data() as Map<String, dynamic>;
               DateTime? expiry = (data['subscription_expiry'] as Timestamp?)?.toDate();
               int days = expiry != null ? expiry.difference(DateTime.now()).inDays : 0;
 
-              return ListTile(
-                leading: CircleAvatar(backgroundImage: data['personal_image'] != null ? MemoryImage(base64Decode(data['personal_image'])) : null),
-                title: Text(data['full_name']),
-                subtitle: Text("باقي: $days يوم | ${data['wilaya']}"),
-                trailing: IconButton(
-                  icon: const Icon(Icons.block, color: Colors.red),
-                  onPressed: () => FirebaseFirestore.instance.collection('users').doc(snapshot.data!.docs[index].id).update({'status': 'banned'}),
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  leading: CircleAvatar(backgroundImage: data['personal_image'] != null ? MemoryImage(base64Decode(data['personal_image'])) : null),
+                  title: Text(data['full_name']),
+                  subtitle: Text("${data['specialty'] ?? ''} | باقي: $days يوم"),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.block, color: Colors.red),
+                    onPressed: () => FirebaseFirestore.instance.collection('users').doc(snapshot.data!.docs[index].id).update({'status': 'banned'}),
+                  ),
+                  onTap: () {
+                    showModalBottomSheet(context: context, builder: (_) => Container(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Text("التفاصيل الكاملة", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                        const SizedBox(height: 20),
+                        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+                           _ZoomableImage(data['id_card_image'], "البطاقة"),
+                           _ZoomableImage(data['diploma_image'], "الشهادة"),
+                        ]),
+                        const SizedBox(height: 10),
+                        Text("الهاتف: ${data['phone']}"),
+                        Text("الولاية: ${data['wilaya']}"),
+                      ]),
+                    ));
+                  },
                 ),
-                onTap: () {
-                  // عرض التفاصيل الكاملة
-                  showModalBottomSheet(context: context, builder: (_) => Container(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(children: [
-                      Text("التفاصيل الكاملة", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-                      const SizedBox(height: 20),
-                      _ZoomableImage(data['id_card_image'], "البطاقة"),
-                      const SizedBox(height: 10),
-                      Text("الهاتف: ${data['phone']}"),
-                      Text("التخصص: ${data['specialty']}"),
-                    ]),
-                  ));
-                },
               );
             },
           );
@@ -234,7 +243,7 @@ class _ActiveStaffScreen extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// 4️⃣ إدارة الخدمات (Services)
+// 4️⃣ إدارة الخدمات (مع تحديد النوع: ممرض/طبيب/سائق) 🔥 هام جداً
 // -----------------------------------------------------------------------------
 class _ServicesManager extends StatefulWidget {
   const _ServicesManager();
@@ -244,44 +253,77 @@ class _ServicesManager extends StatefulWidget {
 class _ServicesManagerState extends State<_ServicesManager> {
   final _name = TextEditingController();
   final _price = TextEditingController();
+  String _selectedType = 'nurse'; // القيمة الافتراضية
 
   void _add() {
     if(_name.text.isEmpty) return;
     FirebaseFirestore.instance.collection('services').add({
-      'name': _name.text, 'price': int.tryParse(_price.text) ?? 0, 'active': true
+      'name': _name.text, 
+      'price': int.tryParse(_price.text) ?? 0, 
+      'type': _selectedType, // 👈 إضافة النوع ليظهر في القسم الصحيح
+      'active': true
     });
     _name.clear(); _price.clear();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تمت الإضافة")));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("الخدمات")),
+      appBar: AppBar(title: const Text("الخدمات والأسعار")),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(children: [
-              Expanded(flex: 2, child: TextField(controller: _name, decoration: const InputDecoration(labelText: "اسم الخدمة"))),
-              const SizedBox(width: 10),
-              Expanded(flex: 1, child: TextField(controller: _price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "السعر"))),
-              IconButton(icon: const Icon(Icons.add_circle, color: Colors.teal), onPressed: _add)
-            ]),
+          Container(
+            padding: const EdgeInsets.all(15),
+            color: Colors.white,
+            child: Column(
+              children: [
+                Row(children: [
+                  Expanded(flex: 2, child: TextField(controller: _name, decoration: const InputDecoration(labelText: "اسم الخدمة", border: OutlineInputBorder()))),
+                  const SizedBox(width: 10),
+                  Expanded(flex: 1, child: TextField(controller: _price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "السعر", border: OutlineInputBorder()))),
+                ]),
+                const SizedBox(height: 10),
+                // 🟢 قائمة اختيار النوع
+                DropdownButtonFormField<String>(
+                  value: _selectedType,
+                  decoration: const InputDecoration(border: OutlineInputBorder(), labelText: "نوع الخدمة (القسم)"),
+                  items: const [
+                    DropdownMenuItem(value: 'nurse', child: Text("💉 ممرض منزلي")),
+                    DropdownMenuItem(value: 'doctor', child: Text("🩺 طبيب")),
+                    DropdownMenuItem(value: 'driver', child: Text("🚑 سائق إسعاف")),
+                  ], 
+                  onChanged: (v) => setState(() => _selectedType = v!),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: _add, icon: const Icon(Icons.add), label: const Text("إضافة الخدمة")))
+              ],
+            ),
           ),
-          const Divider(),
+          const Divider(height: 1),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance.collection('services').snapshots(),
               builder: (context, snapshot) {
-                if(!snapshot.hasData) return const SizedBox();
+                if(!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 return ListView.builder(
                   itemCount: snapshot.data!.docs.length,
                   itemBuilder: (context, index) {
                     var d = snapshot.data!.docs[index];
+                    var type = d['type'] ?? 'nurse';
+                    IconData icon = type == 'nurse' ? Icons.medical_services : (type == 'doctor' ? Icons.person : Icons.directions_car);
+                    
                     return ListTile(
+                      leading: CircleAvatar(backgroundColor: Colors.teal.shade50, child: Icon(icon, color: Colors.teal)),
                       title: Text(d['name']),
-                      trailing: Text("${d['price']} دج"),
-                      leading: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => d.reference.delete()),
+                      subtitle: Text(type == 'nurse' ? "قسم التمريض" : (type == 'doctor' ? "قسم الأطباء" : "قسم السائقين")),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text("${d['price']} دج", style: const TextStyle(fontWeight: FontWeight.bold)),
+                          IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => d.reference.delete()),
+                        ],
+                      ),
                     );
                   },
                 );
@@ -310,7 +352,7 @@ class _NS extends State<_NotificationSender> {
     FirebaseFirestore.instance.collection('notifications').add({
       'title': _title.text, 'body': _body.text, 'link': _link.text, 'image_url': _img.text, 'created_at': FieldValue.serverTimestamp()
     });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الإرسال للجميع")));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الإرسال للجميع ✅")));
     Navigator.pop(context);
   }
 
@@ -318,16 +360,19 @@ class _NS extends State<_NotificationSender> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("إرسال إشعار")),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            TextField(controller: _title, decoration: const InputDecoration(labelText: "عنوان الإشعار", icon: Icon(Icons.title))),
-            TextField(controller: _body, decoration: const InputDecoration(labelText: "نص الإشعار", icon: Icon(Icons.message))),
-            TextField(controller: _img, decoration: const InputDecoration(labelText: "رابط صورة (اختياري)", icon: Icon(Icons.image))),
-            TextField(controller: _link, decoration: const InputDecoration(labelText: "رابط خارجي (اختياري)", icon: Icon(Icons.link))),
-            const SizedBox(height: 20),
-            ElevatedButton(onPressed: _send, child: const Text("إرسال للجميع 🚀"))
+            TextField(controller: _title, decoration: const InputDecoration(labelText: "عنوان الإشعار", border: OutlineInputBorder(), prefixIcon: Icon(Icons.title))),
+            const SizedBox(height: 15),
+            TextField(controller: _body, maxLines: 3, decoration: const InputDecoration(labelText: "نص الإشعار", border: OutlineInputBorder(), prefixIcon: Icon(Icons.message))),
+            const SizedBox(height: 15),
+            TextField(controller: _img, decoration: const InputDecoration(labelText: "رابط صورة (اختياري)", border: OutlineInputBorder(), prefixIcon: Icon(Icons.image))),
+            const SizedBox(height: 15),
+            TextField(controller: _link, decoration: const InputDecoration(labelText: "رابط خارجي (اختياري)", border: OutlineInputBorder(), prefixIcon: Icon(Icons.link))),
+            const SizedBox(height: 30),
+            SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _send, child: const Text("إرسال للجميع 🚀")))
           ],
         ),
       ),
@@ -345,9 +390,12 @@ class _LiveMonitor extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("الطلبات الحية")),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('requests').orderBy('created_at', descending: true).limit(50).snapshots(),
+        // إزالة الترتيب مؤقتاً لحل مشكلة الدوران
+        stream: FirebaseFirestore.instance.collection('requests').limit(50).snapshots(),
         builder: (context, snapshot) {
           if(!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (snapshot.data!.docs.isEmpty) return const Center(child: Text("لا توجد طلبات نشطة"));
+
           return ListView.builder(
             itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
@@ -356,7 +404,8 @@ class _LiveMonitor extends StatelessWidget {
               return Card(
                 color: c.withOpacity(0.1),
                 child: ListTile(
-                  title: Text(d['service']),
+                  leading: Icon(Icons.circle, color: c, size: 15),
+                  title: Text(d['service'] ?? "خدمة"),
                   subtitle: Text("${d['patient_name']} -> ${d['wilaya']}"),
                   trailing: Text(d['status']),
                 ),
