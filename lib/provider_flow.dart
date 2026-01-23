@@ -8,54 +8,56 @@ import 'package:url_launcher/url_launcher.dart';
 import 'auth_screens.dart'; // للعودة عند الخروج
 
 // -----------------------------------------------------------------------------
-// 🚦 البوابة الذكية (Gatekeeper)
-// توجه الشريك حسب حالته (جديد، قيد المراجعة، يحتاج دفع، نشط)
+// 🚦 البوابة الذكية (Gatekeeper) - تم إصلاح مشكلة الخروج المفاجئ
 // -----------------------------------------------------------------------------
 class ProviderGate extends StatelessWidget {
   const ProviderGate({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final userId = FirebaseAuth.instance.currentUser!.uid;
+    final user = FirebaseAuth.instance.currentUser;
+
+    // حماية إضافية: إذا لم يكن هناك مستخدم، عد لصفحة الدخول
+    if (user == null) return const LoginScreen();
 
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
+      stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        
-        // إذا لم يكن المستند موجوداً (خطأ نادر)
-        if (!snapshot.data!.exists) return const LoginScreen();
+        // 1️⃣ إصلاح الكراش: إظهار شاشة تحميل أثناء جلب البيانات
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.teal)));
+        }
+
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const LoginScreen(); // حساب غير موجود، عد للدخول
+        }
 
         var data = snapshot.data!.data() as Map<String, dynamic>;
         String status = data['status'] ?? 'pending_docs';
 
-        // 1. لم يرفع الوثائق بعد
+        // توجيه دقيق حسب الحالة
         if (status == 'pending_docs') return const _DocsUploadScreen();
         
-        // 2. الوثائق قيد المراجعة من الإدارة
         if (status == 'under_review') return const _StatusScreen(
           title: "جاري المراجعة 📄",
           msg: "يقوم فريق عافية بمراجعة وثائقك.\nستصلك الموافقة قريباً للمرور لمرحلة الدفع.",
           icon: Icons.hourglass_top, color: Colors.orange
         );
 
-        // 3. تم القبول، يجب دفع الاشتراك
         if (status == 'pending_payment') return const _PaymentScreen();
 
-        // 4. تم الدفع، في انتظار تفعيل الاشتراك
         if (status == 'payment_review') return const _StatusScreen(
           title: "جاري تأكيد الدفع 💸",
           msg: "وصلنا الإيصال. سيتم تفعيل حسابك خلال ساعات.\nاستعد للعمل!",
           icon: Icons.check_circle_outline, color: Colors.blue
         );
 
-        // 5. الحساب نشط! (أهلاً بك في العمل)
         if (status == 'active') return const ProviderDashboard();
 
-        // 6. مرفوض
+        // في حالة الرفض أو الحظر
         return const _StatusScreen(
           title: "عذراً",
-          msg: "تم رفض الطلب لعدم تطابق الشروط.\nتواصل مع الدعم للمزيد.",
+          msg: "تم تعليق حسابك أو رفض الطلب.\nتواصل مع الدعم للمزيد.",
           icon: Icons.block, color: Colors.red
         );
       },
@@ -64,7 +66,7 @@ class ProviderGate extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// 1️⃣ شاشة رفع الوثائق (المرحلة الأولى)
+// 1️⃣ شاشة رفع الوثائق
 // -----------------------------------------------------------------------------
 class _DocsUploadScreen extends StatefulWidget {
   const _DocsUploadScreen();
@@ -77,7 +79,7 @@ class _DocsUploadScreenState extends State<_DocsUploadScreen> {
   bool _loading = false;
 
   Future<void> _pick(String type) async {
-    final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 30); // ضغط قوي
+    final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 25); // ضغط قوي للصور
     if (file != null) {
       String b64 = base64Encode(await File(file.path).readAsBytes());
       setState(() {
@@ -94,12 +96,16 @@ class _DocsUploadScreenState extends State<_DocsUploadScreen> {
       return;
     }
     setState(() => _loading = true);
-    await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
-      'status': 'under_review',
-      'id_card_image': _idImg,
-      'diploma_image': _dipImg,
-      'personal_image': _photoImg,
-    });
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
+        'status': 'under_review',
+        'id_card_image': _idImg,
+        'diploma_image': _dipImg,
+        'personal_image': _photoImg,
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("حدث خطأ، حاول مرة أخرى")));
+    }
     setState(() => _loading = false);
   }
 
@@ -132,7 +138,7 @@ class _DocsUploadScreenState extends State<_DocsUploadScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// 2️⃣ شاشة الدفع (المرحلة الثانية)
+// 2️⃣ شاشة الدفع
 // -----------------------------------------------------------------------------
 class _PaymentScreen extends StatefulWidget {
   const _PaymentScreen();
@@ -158,7 +164,6 @@ class _PaymentScreenState extends State<_PaymentScreen> {
             const Text("لتفعيل حسابك، يرجى دفع رسوم الاشتراك", style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 20),
             
-            // بطاقة المعلومات البريدية
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade300)),
@@ -176,7 +181,7 @@ class _PaymentScreenState extends State<_PaymentScreen> {
             const SizedBox(height: 30),
 
             _DocButton("إرفاق وصل الدفع", _receipt != null, () async {
-              final f = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 30);
+              final f = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 25);
               if (f != null) setState(() async => _receipt = base64Encode(await File(f.path).readAsBytes()));
             }),
 
@@ -233,6 +238,27 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
     FirebaseFirestore.instance.collection('users').doc(_uid).update({'is_online': val});
   }
 
+  // دوال الاتصال والخرائط (مع حماية من الأخطاء)
+  void _call(String? ph) async {
+    if (ph == null || ph.isEmpty) return;
+    final Uri launchUri = Uri(scheme: 'tel', path: ph);
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("لا يمكن إجراء المكالمة")));
+    }
+  }
+
+  void _map(String? loc) async {
+    if (loc == null || loc.isEmpty) return;
+    final Uri googleUrl = Uri.parse('google.navigation:q=${loc.replaceAll(' ', '')}&mode=d');
+    try {
+      await launchUrl(googleUrl, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تعذر فتح الخرائط")));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -251,7 +277,7 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
             )
         ],
       ),
-      body: _idx == 0 ? _WorkTab(uid: _uid, isOnline: _isOnline) : _ProfileTab(uid: _uid),
+      body: _idx == 0 ? _WorkTab(uid: _uid, isOnline: _isOnline, callFunc: _call, mapFunc: _map) : _ProfileTab(uid: _uid),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _idx,
         onTap: (i) => setState(() => _idx = i),
@@ -265,15 +291,14 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
   }
 }
 
-// --- تبويب العمل (الرادار + المهام النشطة) ---
+// --- تبويب العمل (الرادار) ---
 class _WorkTab extends StatelessWidget {
   final String uid;
   final bool isOnline;
-  const _WorkTab({required this.uid, required this.isOnline});
+  final Function(String?) callFunc;
+  final Function(String?) mapFunc;
 
-  // دوال مساعدة
-  void _call(String ph) async => await launchUrl(Uri.parse("tel:$ph"));
-  void _map(String loc) async => await launchUrl(Uri.parse("google.navigation:q=${loc.replaceAll(' ', '')}&mode=d"), mode: LaunchMode.externalApplication);
+  const _WorkTab({required this.uid, required this.isOnline, required this.callFunc, required this.mapFunc});
 
   @override
   Widget build(BuildContext context) {
@@ -285,23 +310,22 @@ class _WorkTab extends StatelessWidget {
             const Icon(Icons.power_off, size: 80, color: Colors.grey),
             const SizedBox(height: 20),
             const Text("أنت غير متصل", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const Text("فعّل وضع العمل لاستقبال الطلبات", style: TextStyle(color: Colors.grey)),
-            Switch(value: false, onChanged: (v) => FirebaseFirestore.instance.collection('users').doc(uid).update({'is_online': true})),
+            const Text("فعّل زر الاتصال بالأعلى لاستقبال الطلبات", style: TextStyle(color: Colors.grey)),
           ],
         ),
       );
     }
 
-    // 1. فحص هل هناك مهمة نشطة حالياً؟
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('requests')
           .where('provider_id', isEqualTo: uid)
           .where('status', whereIn: ['accepted', 'on_way'])
           .snapshots(),
       builder: (context, activeSnap) {
+        if (activeSnap.hasError) return const Center(child: Text("خطأ في تحميل البيانات"));
         if (!activeSnap.hasData) return const Center(child: CircularProgressIndicator());
         
-        // 🔥 حالة 1: يوجد مهمة نشطة -> عرض تفاصيل المريض الكاملة
+        // 🔥 حالة 1: مهمة نشطة
         if (activeSnap.data!.docs.isNotEmpty) {
           var job = activeSnap.data!.docs.first;
           var data = job.data() as Map<String, dynamic>;
@@ -321,61 +345,62 @@ class _WorkTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 
-                // كارت تفاصيل المريض
-                Container(
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]),
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: const CircleAvatar(backgroundColor: Colors.teal, child: Icon(Icons.person, color: Colors.white)),
-                        title: Text(data['patient_name'] ?? "المريض"),
-                        subtitle: Text(data['service']),
-                        trailing: Text("${data['price']} دج", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, fontSize: 18)),
-                      ),
-                      const Divider(),
-                      if (data['image_data'] != null)
-                         ElevatedButton.icon(
-                           icon: const Icon(Icons.image), 
-                           label: const Text("عرض صورة الحالة"),
-                           onPressed: () => showDialog(context: context, builder: (_) => Dialog(child: Image.memory(base64Decode(data['image_data'])))),
-                         ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(child: ElevatedButton.icon(onPressed: () => _call(data['phone']), icon: const Icon(Icons.call), label: const Text("اتصال"), style: ElevatedButton.styleFrom(backgroundColor: Colors.green))),
-                          const SizedBox(width: 10),
-                          Expanded(child: ElevatedButton.icon(onPressed: () => _map(data['location']), icon: const Icon(Icons.map), label: const Text("الموقع"), style: ElevatedButton.styleFrom(backgroundColor: Colors.blue))),
-                        ],
-                      ),
-                      if(data['details'] != null && data['details'].isNotEmpty)
-                         Padding(padding: const EdgeInsets.only(top: 10), child: Text("ملاحظة: ${data['details']}", style: const TextStyle(color: Colors.red))),
-                    ],
+                // تفاصيل المريض
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const CircleAvatar(backgroundColor: Colors.teal, child: Icon(Icons.person, color: Colors.white)),
+                          title: Text(data['patient_name'] ?? "المريض"),
+                          subtitle: Text(data['service'] ?? ""),
+                          trailing: Text("${data['price']} دج", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, fontSize: 18)),
+                        ),
+                        const Divider(),
+                        if (data['image_data'] != null)
+                           TextButton.icon(
+                             icon: const Icon(Icons.image), 
+                             label: const Text("عرض صورة الحالة"),
+                             onPressed: () => showDialog(context: context, builder: (_) => Dialog(child: Image.memory(base64Decode(data['image_data'])))),
+                           ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(child: ElevatedButton.icon(onPressed: () => callFunc(data['phone']), icon: const Icon(Icons.call), label: const Text("اتصال"), style: ElevatedButton.styleFrom(backgroundColor: Colors.green))),
+                            const SizedBox(width: 10),
+                            Expanded(child: ElevatedButton.icon(onPressed: () => mapFunc(data['location']), icon: const Icon(Icons.map), label: const Text("الموقع"), style: ElevatedButton.styleFrom(backgroundColor: Colors.blue))),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 
                 const SizedBox(height: 30),
                 
-                // أزرار التحكم في الحالة
                 if (data['status'] == 'accepted')
                   SizedBox(width: double.infinity, height: 55, child: ElevatedButton(
-                    onPressed: () { _map(data['location']); job.reference.update({'status': 'on_way'}); },
+                    onPressed: () { mapFunc(data['location']); job.reference.update({'status': 'on_way'}); },
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                    child: const Text("أنا في الطريق (فتح الخريطة) 🚗"),
+                    child: const Text("أنا في الطريق 🚗"),
                   )),
                 
                 if (data['status'] == 'on_way')
                   SizedBox(width: double.infinity, height: 55, child: ElevatedButton(
                     onPressed: () => job.reference.update({'status': 'completed'}),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                    child: const Text("إتمام المهمة واستلام المبلغ ✅"),
+                    child: const Text("إتمام المهمة ✅"),
                   )),
                 
                 const SizedBox(height: 20),
                 TextButton(
                   onPressed: () => showDialog(context: context, builder: (ctx) => AlertDialog(
                     title: const Text("إلغاء المهمة؟"), 
-                    content: const Text("يرجى الاتصال بالمريض أولاً."), 
+                    content: const Text("يجب الاتصال بالمريض أولاً قبل الإلغاء."), 
                     actions: [
                       TextButton(onPressed: ()=>Navigator.pop(ctx), child: const Text("تراجع")),
                       TextButton(onPressed: (){ job.reference.update({'status': 'pending', 'provider_id': null}); Navigator.pop(ctx); }, child: const Text("إلغاء", style: TextStyle(color: Colors.red))),
@@ -388,17 +413,21 @@ class _WorkTab extends StatelessWidget {
           );
         }
 
-        // 📡 حالة 2: لا توجد مهمة -> شغل الرادار (بحث في نفس الولاية)
+        // 📡 حالة 2: الرادار (البحث)
         return StreamBuilder<DocumentSnapshot>(
           stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
           builder: (context, userSnap) {
             if(!userSnap.hasData) return const SizedBox();
-            String myWilaya = userSnap.data!['wilaya'] ?? "";
+            var userData = userSnap.data!.data() as Map<String, dynamic>;
+            String myWilaya = userData['wilaya'] ?? "";
+            String mySpecialty = userData['specialty'] ?? ""; // تخصص الممرض/الطبيب
 
             return StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance.collection('requests')
                   .where('status', isEqualTo: 'pending')
-                  .where('wilaya', isEqualTo: myWilaya) // فلترة جغرافية صارمة
+                  .where('wilaya', isEqualTo: myWilaya)
+                  // هنا يمكن إضافة فلتر التخصص إذا كان المريض يحدد النوع
+                  // .where('type', isEqualTo: mySpecialty) 
                   .snapshots(),
               builder: (context, reqSnap) {
                 if (!reqSnap.hasData) return const Center(child: CircularProgressIndicator());
@@ -406,7 +435,7 @@ class _WorkTab extends StatelessWidget {
 
                 if (docs.isEmpty) {
                   return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(Icons.radar, size: 100, color: Colors.teal.withOpacity(0.2)),
+                    Icon(Icons.radar, size: 80, color: Colors.teal.withOpacity(0.2)),
                     const SizedBox(height: 20),
                     Text("جاري البحث في $myWilaya...", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
                   ]));
@@ -419,7 +448,7 @@ class _WorkTab extends StatelessWidget {
                     var req = docs[index].data() as Map<String, dynamic>;
                     return Card(
                       margin: const EdgeInsets.only(bottom: 15),
-                      elevation: 5,
+                      elevation: 3,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       child: Padding(
                         padding: const EdgeInsets.all(15),
@@ -431,8 +460,8 @@ class _WorkTab extends StatelessWidget {
                             ]),
                             const Divider(),
                             ListTile(
-                              title: Text(req['service']),
-                              subtitle: Text("يبعد عنك مسافة قصيرة"), // يمكن حسابها بـ Geolocator لاحقاً
+                              title: Text(req['service'] ?? "خدمة"),
+                              subtitle: Text(req['patient_name'] ?? ""),
                               leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.orange.shade50, shape: BoxShape.circle), child: const Icon(Icons.medical_services, color: Colors.orange)),
                             ),
                             const SizedBox(height: 10),
@@ -455,7 +484,7 @@ class _WorkTab extends StatelessWidget {
   }
 }
 
-// --- تبويب الحساب (Profile & Stats) ---
+// --- تبويب الحساب ---
 class _ProfileTab extends StatelessWidget {
   final String uid;
   const _ProfileTab({required this.uid});
@@ -468,7 +497,6 @@ class _ProfileTab extends StatelessWidget {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         var data = snapshot.data!.data() as Map<String, dynamic>;
 
-        // حساب الأيام المتبقية
         DateTime? expiry = (data['subscription_expiry'] as Timestamp?)?.toDate();
         int daysLeft = expiry != null ? expiry.difference(DateTime.now()).inDays : 0;
 
@@ -476,18 +504,17 @@ class _ProfileTab extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              // كارت المعلومات الشخصية
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
                 child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 40, 
+                      radius: 35, 
                       backgroundImage: data['personal_image'] != null ? MemoryImage(base64Decode(data['personal_image'])) : null,
-                      child: data['personal_image'] == null ? const Icon(Icons.person, size: 40) : null,
+                      child: data['personal_image'] == null ? const Icon(Icons.person, size: 35) : null,
                     ),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 15),
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(data['full_name'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       Text(data['specialty'] ?? "شريك", style: const TextStyle(color: Colors.grey)),
@@ -498,25 +525,13 @@ class _ProfileTab extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // الإحصائيات (أرباح وهمية للمثال، يمكن حسابها حقيقية بـ cloud functions)
               Row(
                 children: [
-                  _StatCard("الأرباح", "0 دج", Icons.attach_money, Colors.green),
-                  const SizedBox(width: 15),
                   _StatCard("الاشتراك", "$daysLeft يوم", Icons.timer, daysLeft < 5 ? Colors.red : Colors.blue),
                 ],
               ),
               const SizedBox(height: 20),
 
-              // زر الدعم
-              ListTile(
-                tileColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                leading: const Icon(Icons.support_agent, color: Colors.teal),
-                title: const Text("تواصل مع الإدارة"),
-                onTap: () => launchUrl(Uri.parse("https://wa.me/213562898252")),
-              ),
-              const SizedBox(height: 10),
               ListTile(
                 tileColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
